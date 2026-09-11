@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { ParsedTrack } from '@/lib/codeParser'
+import { getDmxPostHeaders } from '@/lib/dmxBridge'
 import type { LightingProjectState, SectionMarker } from '@/types/project'
 import type { DmxVisualizationData, VisualizationMode } from '@/components/visualization/types'
 
@@ -77,12 +78,15 @@ const DmxControlPanel = ({
     try {
       const response = await fetch(`${bridgeUrl}${path}`, {
         method: 'POST',
-        headers: payload ? { 'Content-Type': 'application/json' } : undefined,
+        headers: getDmxPostHeaders(Boolean(payload)),
         body: payload ? JSON.stringify(payload) : undefined,
       })
 
       if (!response.ok) {
-        throw new Error(`Control request failed: ${response.status}`)
+        const message = response.status === 401
+          ? 'DMX bridge rejected the request. Set VITE_DMX_HTTP_TOKEN to match DMX_HTTP_TOKEN.'
+          : `Control request failed: ${response.status}`
+        throw new Error(message)
       }
 
       setControlError(null)
@@ -370,6 +374,18 @@ const DmxControlPanel = ({
             const intensity = binding?.intensity ?? 180
             const holdMs = binding?.hold_ms ?? 150
             const fadeMs = binding?.fade_ms ?? 30
+            const hasBinding = Boolean(binding)
+            const updateTrackBinding = (patch: { intensity?: number; hold_ms?: number; fade_ms?: number }) => {
+              if (!binding) return
+              onLightingChange({
+                ...lighting,
+                group_bindings: groupBindings.map((candidate) =>
+                  candidate.track_name === track.name
+                    ? { ...candidate, ...patch }
+                    : candidate,
+                ),
+              })
+            }
             return (
               <div key={track.id} className="space-y-2 rounded-lg border border-cyan-900/50 bg-black/20 px-2 py-2 text-xs">
                 <div className="grid grid-cols-[minmax(0,1fr)_140px] items-center gap-2">
@@ -391,15 +407,9 @@ const DmxControlPanel = ({
                     <button
                       key={preset.label}
                       type="button"
-                      onClick={() => onLightingChange({
-                        ...lighting,
-                        group_bindings: groupBindings.map((candidate) =>
-                          candidate.track_name === track.name
-                            ? { ...candidate, intensity: preset.intensity, hold_ms: preset.hold_ms, fade_ms: preset.fade_ms }
-                            : candidate,
-                        ),
-                      })}
-                      className="rounded-full border border-cyan-800/60 bg-cyan-950/20 px-2 py-1 text-[10px] text-cyan-100 transition hover:bg-cyan-900/35"
+                      disabled={!hasBinding}
+                      onClick={() => updateTrackBinding({ intensity: preset.intensity, hold_ms: preset.hold_ms, fade_ms: preset.fade_ms })}
+                      className="rounded-full border border-cyan-800/60 bg-cyan-950/20 px-2 py-1 text-[10px] text-cyan-100 transition hover:bg-cyan-900/35 disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       {preset.label}
                     </button>
@@ -414,14 +424,8 @@ const DmxControlPanel = ({
                       max={255}
                       step={1}
                       value={intensity}
-                      onChange={(event) => onLightingChange({
-                        ...lighting,
-                        group_bindings: groupBindings.map((candidate) =>
-                          candidate.track_name === track.name
-                            ? { ...candidate, intensity: Number(event.target.value) }
-                            : candidate,
-                        ),
-                      })}
+                      disabled={!hasBinding}
+                      onChange={(event) => updateTrackBinding({ intensity: Number(event.target.value) })}
                       className="flex-1 accent-cyan-400"
                     />
                     <span className="w-8 text-right tabular-nums">{intensity}</span>
@@ -434,14 +438,8 @@ const DmxControlPanel = ({
                       max={2000}
                       step={10}
                       value={holdMs}
-                      onChange={(event) => onLightingChange({
-                        ...lighting,
-                        group_bindings: groupBindings.map((candidate) =>
-                          candidate.track_name === track.name
-                            ? { ...candidate, hold_ms: Number(event.target.value) }
-                            : candidate,
-                        ),
-                      })}
+                      disabled={!hasBinding}
+                      onChange={(event) => updateTrackBinding({ hold_ms: Number(event.target.value) })}
                       className="flex-1 accent-cyan-400"
                     />
                     <span className="w-12 text-right tabular-nums">{holdMs}ms</span>
@@ -454,14 +452,8 @@ const DmxControlPanel = ({
                       max={1000}
                       step={10}
                       value={fadeMs}
-                      onChange={(event) => onLightingChange({
-                        ...lighting,
-                        group_bindings: groupBindings.map((candidate) =>
-                          candidate.track_name === track.name
-                            ? { ...candidate, fade_ms: Number(event.target.value) }
-                            : candidate,
-                        ),
-                      })}
+                      disabled={!hasBinding}
+                      onChange={(event) => updateTrackBinding({ fade_ms: Number(event.target.value) })}
                       className="flex-1 accent-cyan-400"
                     />
                     <span className="w-12 text-right tabular-nums">{fadeMs}ms</span>

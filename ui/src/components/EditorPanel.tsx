@@ -6,7 +6,7 @@
 
 import { forwardRef, useEffect, useRef } from 'react'
 import { Shuffle, Sparkles, Waves, Wand2 } from 'lucide-react'
-import StrudelEditor, { type CycleInfo } from '@/components/StrudelEditor'
+import StrudelEditor, { type CycleInfo, type TrackTriggerEvent } from '@/components/StrudelEditor'
 import SectionStrip from '@/components/SectionStrip'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -51,6 +51,7 @@ interface EditorPanelProps {
   onInitStateChange: (initialized: boolean, initializing: boolean) => void
   onStrudelError: (error: string) => void
   onCodeEvaluated: () => void
+  onTrackTrigger?: (event: TrackTriggerEvent) => void
   onSelectSection: (section: SectionMarker) => void
   onShuffleRhythm: () => void
   onAddVariation: () => void
@@ -62,7 +63,7 @@ const EditorPanel = forwardRef<HTMLDivElement, EditorPanelProps>((
   {
     project, sections, activeSection, activeLightingScene, activeLightingGroup, isPlaying, showVisualization, audioAnalyser, visualizationMode = 'hal', dmxVisualizationData, dmxBridgeUrl,
     onEditorReady, onAnalyserReady, onCodeChange, onEditorActivity, onPlayStateChange, onInitStateChange,
-    onStrudelError, onCodeEvaluated, onSelectSection,
+    onStrudelError, onCodeEvaluated, onTrackTrigger, onSelectSection,
     onShuffleRhythm, onAddVariation, onRandomReverb, onJuxRev,
   },
   editorContainerRef,
@@ -118,6 +119,7 @@ const EditorPanel = forwardRef<HTMLDivElement, EditorPanelProps>((
             onInitStateChange={onInitStateChange}
             onStrudelError={(error) => onStrudelError(error)}
             onCodeEvaluated={onCodeEvaluated}
+            onTrackTrigger={onTrackTrigger}
           />
         </div>
       </div>

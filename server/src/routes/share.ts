@@ -4,11 +4,17 @@ import { Env } from '../index'
 export const shareRoute = new Hono<{ Bindings: Env }>()
 
 const getPublicAppUrl = (appUrl?: string) => {
-  if (!appUrl) return 'https://shoe.ussyco.de'
+  if (!appUrl) return 'https://strudel.ussyco.de'
   if (appUrl.includes('100.72.41.9') || appUrl.includes('localhost')) {
-    return 'https://shoe.ussyco.de'
+    return 'https://strudel.ussyco.de'
   }
   return appUrl
+}
+
+const normalizeShareTitle = (value: unknown) => {
+  if (typeof value !== 'string') return 'Shared Strudelussy Session'
+  const title = value.trim().slice(0, 80)
+  return title || 'Shared Strudelussy Session'
 }
 
 // Helper function to generate a short URL-safe ID
@@ -54,6 +60,7 @@ shareRoute.post('/', async (c) => {
 
     const body = await c.req.json()
     const { code } = body
+    const title = normalizeShareTitle(body.title)
 
     if (!code || typeof code !== 'string') {
       return c.json({ error: 'Code is required' }, 400)
@@ -75,7 +82,7 @@ shareRoute.post('/', async (c) => {
       const publicAppUrl = getPublicAppUrl(c.env.APP_URL)
       return c.json({ 
         id: existingId,
-        url: `${publicAppUrl}/?share=${existingId}`,
+        url: `${publicAppUrl}/share/${existingId}`,
         isNew: false
       })
     }
@@ -96,6 +103,7 @@ shareRoute.post('/', async (c) => {
 
     // Store the pattern with the share ID
     await c.env.SHARES_KV.put(`share:${shareId}`, code)
+    await c.env.SHARES_KV.put(`share:${shareId}:meta`, JSON.stringify({ title, created_at: new Date().toISOString() }))
     
     // Store the hash -> ID mapping for deduplication
     await c.env.SHARES_KV.put(`hash:${codeHash}`, shareId)
@@ -103,7 +111,7 @@ shareRoute.post('/', async (c) => {
     const publicAppUrl = getPublicAppUrl(c.env.APP_URL)
     return c.json({ 
       id: shareId,
-      url: `${publicAppUrl}/?share=${shareId}`,
+      url: `${publicAppUrl}/share/${shareId}`,
       isNew: true
     })
   } catch (error) {
@@ -140,13 +148,17 @@ shareRoute.get('/:id', async (c) => {
       return c.json({ error: 'Invalid share ID format' }, 400)
     }
 
-    const code = await c.env.SHARES_KV.get(`share:${shareId}`)
+    const [code, rawMeta] = await Promise.all([
+      c.env.SHARES_KV.get(`share:${shareId}`),
+      c.env.SHARES_KV.get(`share:${shareId}:meta`),
+    ])
 
     if (!code) {
       return c.json({ error: 'Share not found' }, 404)
     }
 
-    return c.json({ code })
+    const meta = rawMeta ? JSON.parse(rawMeta) as { title?: string; created_at?: string } : {}
+    return c.json({ code, title: normalizeShareTitle(meta.title), created_at: meta.created_at })
   } catch (error) {
     console.error('Error retrieving share:', error)
     return c.json({ error: 'Failed to retrieve share' }, 500)

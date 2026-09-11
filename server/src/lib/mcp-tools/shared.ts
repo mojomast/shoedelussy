@@ -94,11 +94,12 @@ export const saveMcpPatternRecord = async (env: Env, projectId: string | undefin
 
 export const findProjectAcrossUsers = async (env: Env, projectId: string): Promise<ProjectRecord | null> => {
   const mappedUserId = await env.PROJECTS_KV.get(getMcpProjectId(projectId))
-  if (!mappedUserId) {
-    return null
+  if (mappedUserId) {
+    return getProjectRecord(env, mappedUserId, projectId)
   }
 
-  return getProjectRecord(env, mappedUserId, projectId)
+  const projects = await listAllProjectsForMcp(env)
+  return projects.find((project) => project.id === projectId) ?? null
 }
 
 export const saveProjectForMcp = async (env: Env, project: ProjectRecord): Promise<ProjectRecord> => {

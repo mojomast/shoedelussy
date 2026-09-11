@@ -227,11 +227,11 @@ export const api = {
     return finalResponse
   },
 
-  shareCode: (code: string) =>
+  shareCode: (code: string, title?: string) =>
     request<{ id: string; url: string }>('/api/share', {
       method: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, title }),
     }),
 
-  loadSharedCode: (shareId: string) => request<{ code: string }>(`/api/share/${shareId}`),
+  loadSharedCode: (shareId: string) => request<{ code: string; title?: string; created_at?: string }>(`/api/share/${shareId}`),
 }

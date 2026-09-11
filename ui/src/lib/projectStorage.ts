@@ -24,19 +24,39 @@ export interface TutorialProgressData {
 
 const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 
-const getStorageItem = (...keys: string[]): string | null => {
-  if (!canUseStorage()) return null
+const safeGetItem = (key: string): string | null => {
+  try {
+    return canUseStorage() ? window.localStorage.getItem(key) : null
+  } catch {
+    return null
+  }
+}
 
+const safeSetItem = (key: string, value: string): boolean => {
+  try {
+    if (!canUseStorage()) return false
+    window.localStorage.setItem(key, value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const safeRemoveItem = (key: string): void => {
+  try {
+    if (canUseStorage()) window.localStorage.removeItem(key)
+  } catch {
+    // Ignore unavailable storage and quota/security errors.
+  }
+}
+
+const getStorageItem = (...keys: string[]): string | null => {
   for (const key of keys) {
-    const value = window.localStorage.getItem(key)
+    const value = safeGetItem(key)
     if (value === null) continue
 
     if (key !== keys[0]) {
-      try {
-        window.localStorage.setItem(keys[0], value)
-      } catch {
-        // Ignore migration failures and still return the legacy value.
-      }
+      safeSetItem(keys[0], value)
     }
 
     return value
@@ -62,8 +82,7 @@ const readProjects = (): Record<string, Project> => {
 }
 
 const writeProjects = (projects: Record<string, Project>) => {
-  if (!canUseStorage()) return
-  window.localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects))
+  safeSetItem(PROJECTS_KEY, JSON.stringify(projects))
 }
 
 export const getOrCreateGuestUserId = (): string => {
@@ -75,7 +94,7 @@ export const getOrCreateGuestUserId = (): string => {
   if (existing) return existing
 
   const created = createId('guest')
-  window.localStorage.setItem(USER_KEY, created)
+  safeSetItem(USER_KEY, created)
   return created
 }
 
@@ -83,9 +102,7 @@ export const saveLocalProject = (project: Project) => {
   const projects = readProjects()
   projects[project.id] = project
   writeProjects(projects)
-  if (canUseStorage()) {
-    window.localStorage.setItem(LAST_PROJECT_KEY, project.id)
-  }
+  safeSetItem(LAST_PROJECT_KEY, project.id)
 }
 
 export const loadLocalProject = (projectId: string): Project | null => {
@@ -137,11 +154,11 @@ export const loadChatProviderConfig = (): StoredChatProviderConfig | null => {
 export const saveChatProviderConfig = (config: StoredChatProviderConfig | null) => {
   if (!canUseStorage()) return
   if (!config) {
-    window.localStorage.removeItem(CHAT_PROVIDER_KEY)
+    safeRemoveItem(CHAT_PROVIDER_KEY)
     return
   }
 
-  window.localStorage.setItem(CHAT_PROVIDER_KEY, JSON.stringify({
+  safeSetItem(CHAT_PROVIDER_KEY, JSON.stringify({
     ...config,
     systemPromptMode: normalizeSystemPromptMode(config.systemPromptMode),
   }))
@@ -161,8 +178,7 @@ export const loadPromptPresets = (): SavedPromptPreset[] => {
 }
 
 export const savePromptPresets = (presets: SavedPromptPreset[]) => {
-  if (!canUseStorage()) return
-  window.localStorage.setItem(PROMPT_PRESETS_KEY, JSON.stringify(presets))
+  safeSetItem(PROMPT_PRESETS_KEY, JSON.stringify(presets))
 }
 
 export const upsertPromptPreset = (label: string, content: string): SavedPromptPreset[] => {
@@ -186,11 +202,7 @@ export const upsertPromptPreset = (label: string, content: string): SavedPromptP
 export function saveTutorialProgress(data: TutorialProgressData): void {
   if (!canUseStorage()) return
 
-  try {
-    localStorage.setItem(TUTORIAL_PROGRESS_KEY, JSON.stringify(data))
-  } catch {
-    // ignore storage quota errors
-  }
+  safeSetItem(TUTORIAL_PROGRESS_KEY, JSON.stringify(data))
 }
 
 export function loadTutorialProgress(): TutorialProgressData | null {
@@ -219,11 +231,7 @@ export function loadTutorialProgress(): TutorialProgressData | null {
 export function clearTutorialProgress(): void {
   if (!canUseStorage()) return
 
-  try {
-    localStorage.removeItem(TUTORIAL_PROGRESS_KEY)
-    localStorage.removeItem(LEGACY_TUTORIAL_PROGRESS_KEY)
-    localStorage.removeItem(LEGACY_TUTORIAL_PROGRESS_KEY_ALT)
-  } catch {
-    // ignore
-  }
+  safeRemoveItem(TUTORIAL_PROGRESS_KEY)
+  safeRemoveItem(LEGACY_TUTORIAL_PROGRESS_KEY)
+  safeRemoveItem(LEGACY_TUTORIAL_PROGRESS_KEY_ALT)
 }

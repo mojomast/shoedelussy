@@ -41,6 +41,7 @@ app.use('/*', cors({
     }
     // In production, only allow specific production origins
     const allowedOrigins = [
+        'https://strudel.ussyco.de',
         'https://shoe.ussyco.de',
         'https://shoedelussy.ussyco.de',
       ];

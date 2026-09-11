@@ -58,6 +58,12 @@ const ChatPanel = ({
 }: ChatPanelProps) => {
   const [value, setValue] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
+  const promptChips = [
+    'Add a hard-hitting B section',
+    'Make this darker and more danceable',
+    'Fix any Strudel errors',
+    'Turn this into 140 BPM techno',
+  ]
 
   useEffect(() => {
     const container = threadRef.current
@@ -72,6 +78,11 @@ const ChatPanel = ({
     if (!nextValue) return
     setValue('')
     await onSend(nextValue)
+  }
+
+  const handlePromptChip = async (prompt: string) => {
+    setValue('')
+    await onSend(prompt)
   }
 
   const messageCount = messages.length
@@ -236,6 +247,20 @@ const ChatPanel = ({
                 {statusText}
               </div>
             ) : null}
+
+            <div className="mb-3 flex flex-wrap gap-2">
+              {promptChips.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  className="rounded-full border border-[var(--ussy-divider)] bg-[var(--ussy-surface-2)] px-3 py-1.5 text-left text-xs text-[var(--ussy-text-muted)] transition hover:border-[var(--ussy-accent)] hover:text-[var(--ussy-text)] disabled:opacity-50"
+                  disabled={isSending}
+                  onClick={() => void handlePromptChip(prompt)}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
 
             <Textarea
               value={value}

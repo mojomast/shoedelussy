@@ -3,7 +3,7 @@ import { parseTracks } from '@/lib/codeParser'
 // @ts-expect-error - Strudel packages don't have TypeScript declarations
 import { StrudelMirror } from '@strudel/codemirror'
 // @ts-expect-error - Strudel packages don't have TypeScript declarations
-import { evalScope, noteToMidi, valueToMidi, Pattern } from '@strudel/core'
+import { evalScope } from '@strudel/core'
 // @ts-expect-error - Strudel packages don't have TypeScript declarations
 import { initAudioOnFirstClick, getAudioContext, webaudioOutput, registerSynthSounds, registerZZFXSounds, aliasBank } from '@strudel/webaudio'
 // @ts-expect-error - Strudel packages don't have TypeScript declarations
@@ -17,6 +17,10 @@ export interface CycleInfo {
   cps: number // cycles per second
   phase: number // current position within cycle (0-1)
   cycleDurationMs: number // duration of one cycle in ms
+}
+
+export interface TrackTriggerEvent {
+  trackName: string
 }
 
 interface StrudelEditorProps {
@@ -39,13 +43,14 @@ interface StrudelEditorProps {
   onSetCodeReady?: (setCodeFn: (code: string) => void) => void
   onMasterVolumeReady?: (setMasterVolumeFn: (volume: number) => void) => void
   onTrackActivityReady?: (getTrackActivityFn: () => { activeTracks: string[]; cycleStart: number; cycleEnd: number }) => void
+  onTrackTrigger?: (event: TrackTriggerEvent) => void
 }
 
 export interface StrudelEditorHandle {
   jumpToLine: (line: number) => void
 }
 
-const StrudelEditor = forwardRef<StrudelEditorHandle, StrudelEditorProps>(({ initialCode, onCodeChange, onPlayReady, onStopReady, onGetCurrentCode, onPlayStateChange, onAnalyserReady, onInitStateChange, onUndoReady, onRedoReady, onClearReady, onStrudelError, onCodeEvaluated, onCycleInfoReady, onJumpToLineReady, onEvaluateReady, onSetCodeReady, onMasterVolumeReady, onTrackActivityReady }, ref) => {
+const StrudelEditor = forwardRef<StrudelEditorHandle, StrudelEditorProps>(({ initialCode, onCodeChange, onPlayReady, onStopReady, onGetCurrentCode, onPlayStateChange, onAnalyserReady, onInitStateChange, onUndoReady, onRedoReady, onClearReady, onStrudelError, onCodeEvaluated, onCycleInfoReady, onJumpToLineReady, onEvaluateReady, onSetCodeReady, onMasterVolumeReady, onTrackActivityReady, onTrackTrigger }, ref) => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [isInitializing, setIsInitializing] = useState(false)
@@ -80,6 +85,11 @@ const StrudelEditor = forwardRef<StrudelEditorHandle, StrudelEditorProps>(({ ini
   const playStartTimeRef = useRef<number>(0) // Track when playback started - fallback only
   const cpsRef = useRef<number>(0.5) // Default CPS - fallback when scheduler not accessible
   const trackActivityRef = useRef<Map<string, number>>(new Map())
+  const onTrackTriggerRef = useRef(onTrackTrigger)
+
+  useEffect(() => {
+    onTrackTriggerRef.current = onTrackTrigger
+  }, [onTrackTrigger])
 
   const jumpToLine = (line: number) => {
     const cmEditor = strudelMirrorRef.current?.editor
@@ -218,6 +228,16 @@ const StrudelEditor = forwardRef<StrudelEditorHandle, StrudelEditorProps>(({ ini
                   : getAudioContext().currentTime + 0.25
 
               trackActivityRef.current.set(matchedTrack.name, endSeconds)
+
+              const beginSeconds = typeof hap?.begin === 'number'
+                ? hap.begin
+                : typeof hap?.whole?.begin === 'number'
+                  ? hap.whole.begin
+                  : null
+              const triggerDelayMs = beginSeconds === null
+                ? 0
+                : Math.max(0, Math.min(500, (beginSeconds - getAudioContext().currentTime) * 1000))
+              window.setTimeout(() => onTrackTriggerRef.current?.({ trackName: matchedTrack.name }), triggerDelayMs)
             }, false),
             prebake: async () => {
               initAudioOnFirstClick()
@@ -370,10 +390,14 @@ const StrudelEditor = forwardRef<StrudelEditorHandle, StrudelEditorProps>(({ ini
 
           // Enable tab indentation in the editor
           editor.reconfigureExtension('isTabIndentationEnabled', true)
-          editor.reconfigureExtension(
-            'strudelAutocomplete',
-            buildStrudelAutocompleteExtension(getCode),
-          )
+          try {
+            editor.reconfigureExtension(
+              'strudelAutocomplete',
+              buildStrudelAutocompleteExtension(getCode),
+            )
+          } catch {
+            // Some StrudelMirror versions do not expose this named extension slot.
+          }
           
           setIsInitialized(true)
           setError(null)
@@ -606,7 +630,7 @@ const StrudelEditor = forwardRef<StrudelEditorHandle, StrudelEditorProps>(({ ini
         strudelLogListenerRef.current = null
       }
       lastForwardedStrudelErrorRef.current = null
-      // Don't reset initializationRef to prevent StrictMode double-init
+      initializationRef.current = false
     }
   }, [])
 

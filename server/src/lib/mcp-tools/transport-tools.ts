@@ -13,19 +13,28 @@ const setKeySchema = z.object({
 })
 
 export const parseBpmFromCode = (code: string): number | null => {
-  const match = code.match(/setcpm\((\d+(?:\.\d+)?)\)/)
-  if (!match) return null
-  return Math.round(Number.parseFloat(match[1]) * 2)
+  const setcpsMatch = code.match(/setcps\((\d+(?:\.\d+)?)\)/)
+  if (setcpsMatch) return Math.round(Number.parseFloat(setcpsMatch[1]) * 240)
+
+  const legacySetcpmMatch = code.match(/setcpm\((\d+(?:\.\d+)?)\)/)
+  if (legacySetcpmMatch) return Math.round(Number.parseFloat(legacySetcpmMatch[1]) * 2)
+
+  return null
 }
 
 export const countSections = (code: string) => (code.match(/^\/\/ \[[^\]]+\]/gm) ?? []).length
 
-export const upsertSetcpm = (code: string, bpm: number) => {
-  const setcpm = `setcpm(${(bpm / 2).toFixed(2).replace(/\.00$/, '')})`
-  if (/setcpm\([^)]*\)/.test(code)) {
-    return code.replace(/setcpm\([^)]*\)/, setcpm)
+export const upsertSetcps = (code: string, bpm: number) => {
+  const setcps = `setcps(${(bpm / 240).toFixed(4).replace(/0+$/, '').replace(/\.$/, '')})`
+  if (/setcps\([^)]*\)/.test(code)) {
+    return code.replace(/setcps\([^)]*\)/, setcps)
   }
-  return `${setcpm}\n${code.trimStart()}`
+
+  if (/setcpm\([^)]*\)/.test(code)) {
+    return code.replace(/setcpm\([^)]*\)/, setcps)
+  }
+
+  return `${setcps}\n${code.trimStart()}`
 }
 
 export const registerTransportTools = (server: MinimalMcpToolServer, env: Env) => {
@@ -45,7 +54,7 @@ export const registerTransportTools = (server: MinimalMcpToolServer, env: Env) =
 
       const updatedProject = {
         ...project,
-        strudel_code: upsertSetcpm(project.strudel_code, bpm),
+        strudel_code: upsertSetcps(project.strudel_code, bpm),
         bpm,
         updated_at: new Date().toISOString(),
       }

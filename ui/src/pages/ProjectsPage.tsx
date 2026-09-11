@@ -14,6 +14,7 @@ const ProjectsPage = () => {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [remoteProjectIds, setRemoteProjectIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const localProjects = listLocalProjects().map((project) => ({
@@ -29,6 +30,7 @@ const ProjectsPage = () => {
     const userId = getOrCreateGuestUserId()
     api.listProjects(userId).then((remoteProjects) => {
       if (remoteProjects.length > 0) {
+        setRemoteProjectIds(new Set(remoteProjects.map((project) => project.id)))
         setProjects(remoteProjects)
       }
     }).catch(() => {
@@ -97,8 +99,17 @@ const ProjectsPage = () => {
                     variant="outline"
                     className="border-zinc-700 bg-transparent text-zinc-300 hover:bg-zinc-900"
                     onClick={() => {
+                      const userId = getOrCreateGuestUserId()
+                      if (remoteProjectIds.has(project.id)) {
+                        void api.deleteProject(project.id, userId).catch(() => undefined)
+                      }
                       deleteLocalProject(project.id)
                       setProjects((current) => current.filter((entry) => entry.id !== project.id))
+                      setRemoteProjectIds((current) => {
+                        const next = new Set(current)
+                        next.delete(project.id)
+                        return next
+                      })
                     }}
                   >
                     <Trash2 className="h-4 w-4" />

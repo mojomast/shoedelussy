@@ -71,7 +71,7 @@ class PublicProxyHandler(SimpleHTTPRequestHandler):
             headers = {key: value for key, value in self.headers.items()}
             headers["Host"] = target.netloc
             headers["X-Forwarded-Proto"] = "https"
-            headers["X-Forwarded-Host"] = self.headers.get("Host", "shoe.ussyco.de")
+            headers["X-Forwarded-Host"] = self.headers.get("Host", "strudel.ussyco.de")
 
             connection.request(self.command, self.path, body=body, headers=headers)
             response = connection.getresponse()

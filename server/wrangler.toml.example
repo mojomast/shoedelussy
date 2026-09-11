@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 # Environment variables
-APP_URL = "https://shoe.ussyco.de"
+APP_URL = "https://strudel.ussyco.de"
 OPENROUTER_MODEL = "google/gemini-2.5-flash"
 MCP_SECRET = ""
 

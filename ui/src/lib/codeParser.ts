@@ -11,6 +11,7 @@ const paramPatterns = [
 ] as const
 
 const TRACK_START_PATTERN = /^\s*(?:([A-Za-z][\w]*)\s*)?\$:\s*/
+const LEGACY_NAMED_TRACK_PATTERN = /^(\s*)([A-Za-z][\w]*)\s+\$:/gm
 const DRUM_TOKEN_PATTERN = /\b(?:bd|sd|hh)\b/
 
 export interface ParsedTrack {
@@ -22,6 +23,8 @@ export interface ParsedTrack {
   end: number
   source: string
 }
+
+export const normalizeNamedTrackSyntax = (code: string): string => code.replace(LEGACY_NAMED_TRACK_PATTERN, '$1$2$:')
 
 type SupportedEffect = 'room' | 'delay' | 'lpf' | 'hpf' | 'gain'
 

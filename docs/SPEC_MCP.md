@@ -13,7 +13,7 @@ MCP decouples AI control from the browser session, enabling:
 - **External agents** (Claude Desktop, Cursor, custom scripts) to generate/inject Strudel code without opening the web app
 - **Tool-use patterns** — agents can call atomic operations (`write_pattern`, `set_bpm`, `inject_section`) instead of talking through a free-form chat prompt
 - **Composability** — Shoedelussy tools can be mixed with other MCP servers in a single agent workflow
-- **Real-time remote control** — the Shoedelussy runtime at `shoe.ussyco.de` becomes a proper AI instrument endpoint
+- **Real-time remote control** — the Shoedelussy runtime at `strudel.ussyco.de` becomes a proper AI instrument endpoint; `shoe.ussyco.de` can point at the same service as an alias
 
 The prior art confirms demand: the `williamzujkowski/strudel-mcp-server` project (40+ tools, Playwright-based) and the `strudel-mcp` npm package both took the approach of bolting a separate MCP process onto Strudel.cc via browser automation.  
 Shoedelussy can do this natively — no browser required — because the pattern state already lives in the server KV and SSE stream.
@@ -50,7 +50,7 @@ MCP Client (Claude Desktop / Cursor / custom agent)
         │  KV reads/writes (PROJECTS_KV)
         │  SSE broadcast (optional phase 2)
         ▼
-   Shoedelussy UI at shoe.ussyco.de
+   Shoedelussy UI at strudel.ussyco.de
    (polls or subscribes for live pattern updates)
 ```
 
@@ -432,7 +432,7 @@ This is non-blocking — the MCP server works fully without UI changes.
 {
   "mcpServers": {
     "shoedelussy": {
-      "url": "https://shoe.ussyco.de/mcp",
+      "url": "https://strudel.ussyco.de/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_MCP_SECRET"
       }
@@ -446,7 +446,7 @@ This is non-blocking — the MCP server works fully without UI changes.
 {
   "mcpServers": {
     "shoedelussy": {
-      "url": "https://shoe.ussyco.de/mcp",
+      "url": "https://strudel.ussyco.de/mcp",
       "headers": { "Authorization": "Bearer YOUR_MCP_SECRET" }
     }
   }

@@ -77,23 +77,27 @@ projectsRoute.put('/:id', async (c) => {
 
   const projectId = c.req.param('id')
   const existing = await getProjectRecord(c.env, userId, projectId)
+  if (!existing) {
+    return c.json({ error: 'Project not found' }, 404)
+  }
+
   const body = await c.req.json<Partial<ProjectRecord>>()
   const now = new Date().toISOString()
 
   const project: ProjectRecord = {
     id: projectId,
     user_id: userId,
-    name: body.name || existing?.name || 'Untitled Project',
-    description: body.description ?? existing?.description,
-    strudel_code: body.strudel_code ?? existing?.strudel_code ?? '',
-    chat_history: body.chat_history ?? existing?.chat_history ?? [],
-    versions: body.versions ?? existing?.versions ?? [],
-    lighting: body.lighting ?? existing?.lighting,
-    bpm: body.bpm ?? existing?.bpm,
-    key: body.key ?? existing?.key,
-    tags: body.tags ?? existing?.tags ?? [],
-    is_public: body.is_public ?? existing?.is_public ?? false,
-    created_at: existing?.created_at || now,
+    name: body.name || existing.name || 'Untitled Project',
+    description: body.description ?? existing.description,
+    strudel_code: body.strudel_code ?? existing.strudel_code ?? '',
+    chat_history: body.chat_history ?? existing.chat_history ?? [],
+    versions: body.versions ?? existing.versions ?? [],
+    lighting: body.lighting ?? existing.lighting,
+    bpm: body.bpm ?? existing.bpm,
+    key: body.key ?? existing.key,
+    tags: body.tags ?? existing.tags ?? [],
+    is_public: body.is_public ?? existing.is_public ?? false,
+    created_at: existing.created_at || now,
     updated_at: now,
   }
 

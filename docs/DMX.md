@@ -28,6 +28,49 @@ Current UI support:
 - The frontend talks to the bridge over local HTTP for live monitoring and control.
 - UI bridge access is opt-in via `VITE_DMX_BRIDGE_URL`; when unset, the app does not poll localhost and DMX stays disabled in the UI.
 
+## Public Demo Rig
+
+Shoedelussy also has a fake bridge-compatible DMX rig at:
+
+- `https://dmxdemo.ussyco.de`
+- all-in-one recording view: `https://dmxdemo.ussyco.de/jam`
+
+Use it for no-hardware jams and screenshots:
+
+- open `https://dmxdemo.ussyco.de` in one browser tab to watch the fake lighting layout
+- or open `https://dmxdemo.ussyco.de/jam` to see Shoedelussy and the fake lighting rig side by side in one page
+- point Shoedelussy at it with `VITE_DMX_BRIDGE_URL=https://dmxdemo.ussyco.de`
+- use the DMX Monitor, section cue bindings, track group bindings, or scene buttons from `strudel.ussyco.de` / `shoe.ussyco.de`
+- the hosted Shoedelussy build defaults to this public demo rig unless `VITE_DMX_BRIDGE_URL` is overridden at build time
+- the demo implements `/state`, `/patch`, `/scenes`, `/scenes/apply`, `/control/arm`, `/control/disarm`, `/control/blackout`, and `/control/group`
+
+The demo is served by `scripts/dmx_demo_site.py` on `127.0.0.1:9512` and proxied through the existing `dmxdemo.ussyco.de` subdomain route. It sends permissive CORS headers so the hosted Shoedelussy UI can write to it from another subdomain.
+
+### Recording The Demo
+
+Fast path:
+
+1. Open `https://dmxdemo.ussyco.de/jam`.
+2. Press Play in the left Shoedelussy pane.
+3. Record the page; the fake rig is already visible in the right pane.
+
+Two-window path:
+
+1. Open `https://dmxdemo.ussyco.de` in one browser window and make it visible in the recording.
+2. Open `https://strudel.ussyco.de/?template=demo` or `https://shoe.ussyco.de/?template=demo` in another window.
+3. Click `Load Demo` if you are not already on the demo project.
+4. Press Play in Shoedelussy.
+5. The default demo project has named Strudel tracks wired to the fake rig:
+   - `kick$:` -> `strobes`
+   - `snare$:` -> `front_wash`
+   - `floor$:` -> `floor`
+   - `lead$:` -> `all_wash`
+   - `beam$:` -> `back_beams`
+6. Section markers also trigger scenes:
+   - `intro` -> `front_warm`
+   - `drop` -> `club_purple`
+   - `breakdown` -> `back_blue`
+
 ## Bridge
 
 Path:

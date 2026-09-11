@@ -19,6 +19,20 @@
 
 You can use `pnpm start` instead of `pnpm dev` if preferred.
 
+## Public No-Hardware Demo
+
+For jams where you want visible lights without running the local bridge, use:
+
+- `https://dmxdemo.ussyco.de`
+
+Open that URL to watch the fake rig, and point the Shoedelussy UI at it with:
+
+```bash
+VITE_DMX_BRIDGE_URL=https://dmxdemo.ussyco.de
+```
+
+The demo endpoint implements the same core HTTP contract as this bridge, so scene triggers, group writes, and automation pulses from `strudel.ussyco.de` or `shoe.ussyco.de` update the fake stage.
+
 ## Quick Start (OLA Mode)
 
 1. Install OLA: <https://www.openlighting.org/ola/getting-started/>

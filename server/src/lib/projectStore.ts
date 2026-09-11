@@ -60,6 +60,7 @@ export interface ProjectRecord {
 
 const projectKey = (userId: string, projectId: string) => `project:${userId}:${projectId}`
 const projectIndexKey = (userId: string) => `projects:${userId}`
+const mcpProjectKey = (projectId: string) => `mcp-project:${projectId}`
 
 const readIndex = async (env: Env, userId: string): Promise<string[]> => {
   const raw = await env.PROJECTS_KV.get(projectIndexKey(userId))
@@ -77,6 +78,7 @@ const writeIndex = async (env: Env, userId: string, projectIds: string[]) => {
 
 export const saveProjectRecord = async (env: Env, project: ProjectRecord): Promise<ProjectRecord> => {
   await env.PROJECTS_KV.put(projectKey(project.user_id, project.id), JSON.stringify(project))
+  await env.PROJECTS_KV.put(mcpProjectKey(project.id), project.user_id)
   const currentIndex = await readIndex(env, project.user_id)
   if (!currentIndex.includes(project.id)) {
     await writeIndex(env, project.user_id, [...currentIndex, project.id])
@@ -108,6 +110,7 @@ export const deleteProjectRecord = async (env: Env, userId: string, projectId: s
   if (!project) return false
 
   await env.PROJECTS_KV.delete(projectKey(userId, projectId))
+  await env.PROJECTS_KV.delete(mcpProjectKey(projectId))
   const ids = await readIndex(env, userId)
   await writeIndex(env, userId, ids.filter((id) => id !== projectId))
   return true

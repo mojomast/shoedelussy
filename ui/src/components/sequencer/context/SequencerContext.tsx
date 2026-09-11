@@ -252,7 +252,7 @@ export const SequencerProvider = ({
     const earliestStartSlot = Math.min(...selectedNotes.map(n => n.startSlot))
     
     const clipboard = selectedNotes.map(n => {
-      const { id, ...rest } = n
+      const { id: _id, ...rest } = n
       return {
         ...rest,
         startSlot: n.startSlot - earliestStartSlot,
@@ -405,4 +405,3 @@ export const useSequencerContext = () => {
   }
   return context
 }
-

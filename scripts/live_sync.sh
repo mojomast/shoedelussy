@@ -31,9 +31,10 @@ if [[ ! -d "${REPO_ROOT}/server/node_modules" ]]; then
 fi
 
 if [[ ${UPDATED} -eq 1 || ! -f "${REPO_ROOT}/ui/dist/index.html" ]]; then
-  (cd "${REPO_ROOT}/ui" && pnpm build)
+  (cd "${REPO_ROOT}/ui" && VITE_DMX_BRIDGE_URL="${VITE_DMX_BRIDGE_URL:-https://dmxdemo.ussyco.de}" pnpm build)
   pkill -f "${REPO_ROOT}/scripts/public_proxy.py" || true
   pkill -f "${REPO_ROOT}/scripts/run_worker.sh" || true
+  pkill -f "${REPO_ROOT}/scripts/dmx_demo_site.py" || true
 fi
 
 # Do not let background child processes inherit the sync lock fd.
@@ -45,4 +46,8 @@ fi
 
 if ! pgrep -f "${REPO_ROOT}/scripts/public_proxy.py" >/dev/null; then
   nohup python3 "${REPO_ROOT}/scripts/public_proxy.py" >/tmp/shoedelussy-live-proxy.log 2>&1 &
+fi
+
+if ! pgrep -f "${REPO_ROOT}/scripts/dmx_demo_site.py" >/dev/null; then
+  nohup python3 "${REPO_ROOT}/scripts/dmx_demo_site.py" >/tmp/shoedelussy-dmx-demo.log 2>&1 &
 fi

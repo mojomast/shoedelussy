@@ -3,14 +3,40 @@ import { randomUUID } from 'node:crypto'
 import type { DmxMcpConfig } from './config'
 import { DmxBridgeService } from './service'
 
+const MAX_BODY_BYTES = 64 * 1024
+
+class HttpRequestError extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+  }
+}
+
 const readBody = (req: IncomingMessage) => new Promise<string>((resolve, reject) => {
   let body = ''
+  let bytes = 0
   req.on('data', (chunk: Buffer | string) => {
+    bytes += Buffer.byteLength(chunk)
+    if (bytes > MAX_BODY_BYTES) {
+      reject(new HttpRequestError(413, 'Request body is too large'))
+      req.destroy()
+      return
+    }
     body += String(chunk)
   })
   req.on('end', () => resolve(body))
   req.on('error', reject)
 })
+
+const readJsonBody = async <T>(req: IncomingMessage): Promise<Partial<T>> => {
+  const rawBody = await readBody(req)
+  if (!rawBody) return {}
+
+  try {
+    return JSON.parse(rawBody) as Partial<T>
+  } catch {
+    throw new HttpRequestError(400, 'Invalid JSON body')
+  }
+}
 
 const writeJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.statusCode = status
@@ -69,8 +95,7 @@ export const startHttpServer = (service: DmxBridgeService, config: DmxMcpConfig)
       }
 
       if (url.pathname === '/scenes/apply' && req.method === 'POST') {
-        const rawBody = await readBody(req)
-        const payload = rawBody ? JSON.parse(rawBody) as { scene_id?: string; idempotency_key?: string } : {}
+        const payload = await readJsonBody<{ scene_id?: string; idempotency_key?: string }>(req)
         if (!payload.scene_id) {
           writeJson(res, 400, { error: 'scene_id is required' })
           return
@@ -82,30 +107,25 @@ export const startHttpServer = (service: DmxBridgeService, config: DmxMcpConfig)
       }
 
       if (url.pathname === '/control/arm' && req.method === 'POST') {
-        const rawBody = await readBody(req)
-        const payload = rawBody ? JSON.parse(rawBody) as { idempotency_key?: string } : {}
+        const payload = await readJsonBody<{ idempotency_key?: string }>(req)
         writeJson(res, 200, await service.arm(payload.idempotency_key ?? `http-arm-${randomUUID()}`, false))
         return
       }
 
       if (url.pathname === '/control/disarm' && req.method === 'POST') {
-        const rawBody = await readBody(req)
-        const payload = rawBody ? JSON.parse(rawBody) as { idempotency_key?: string } : {}
+        const payload = await readJsonBody<{ idempotency_key?: string }>(req)
         writeJson(res, 200, await service.disarm(payload.idempotency_key ?? `http-disarm-${randomUUID()}`, false))
         return
       }
 
       if (url.pathname === '/control/blackout' && req.method === 'POST') {
-        const rawBody = await readBody(req)
-        const payload = rawBody ? JSON.parse(rawBody) as { idempotency_key?: string } : {}
+        const payload = await readJsonBody<{ idempotency_key?: string }>(req)
         writeJson(res, 200, await service.blackout(payload.idempotency_key ?? `http-blackout-${randomUUID()}`, false))
         return
       }
 
       if (url.pathname === '/control/group' && req.method === 'POST') {
-        const rawBody = await readBody(req)
-        const payload = rawBody
-          ? JSON.parse(rawBody) as {
+        const payload = await readJsonBody<{
               group_id?: string
               intensity?: number
               red?: number
@@ -113,8 +133,7 @@ export const startHttpServer = (service: DmxBridgeService, config: DmxMcpConfig)
               blue?: number
               white?: number
               idempotency_key?: string
-            }
-          : {}
+            }>(req)
         if (!payload.group_id) {
           writeJson(res, 400, { error: 'group_id is required' })
           return
@@ -138,6 +157,10 @@ export const startHttpServer = (service: DmxBridgeService, config: DmxMcpConfig)
 
       writeJson(res, 404, { error: 'Not found' })
     } catch (error) {
+      if (error instanceof HttpRequestError) {
+        writeJson(res, error.status, { error: error.message })
+        return
+      }
       writeJson(res, 500, { error: error instanceof Error ? error.message : 'Internal server error' })
     }
   })

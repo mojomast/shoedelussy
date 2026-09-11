@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { countSections, parseBpmFromCode, upsertSetcpm } from './transport-tools'
+import { countSections, parseBpmFromCode, upsertSetcps } from './transport-tools'
 
 describe('transport MCP helpers', () => {
-  it('set_bpm prepends setcpm correctly', () => {
-    expect(upsertSetcpm('$: s("bd sd")', 120)).toContain('setcpm(60)')
+  it('set_bpm prepends setcps correctly', () => {
+    expect(upsertSetcps('$: s("bd sd")', 120)).toContain('setcps(0.5)')
+  })
+
+  it('set_bpm replaces legacy setcpm values with setcps', () => {
+    expect(upsertSetcps('setcpm(60)\n$: s("bd sd")', 120)).toContain('setcps(0.5)')
+  })
+
+  it('get_state BPM parser reads setcps values', () => {
+    expect(parseBpmFromCode('setcps(0.5)\n$: s("bd sd")')).toBe(120)
   })
 
   it('get_state BPM parser reads setcpm values', () => {

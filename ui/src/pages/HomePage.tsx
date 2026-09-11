@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 
 import ChatPanel from '@/components/ChatPanel'
 import DAWShell from '@/components/DAWShell'
@@ -34,6 +34,7 @@ const EMPTY_LIGHTING: LightingProjectState = {
 
 const HomePage = () => {
   const [searchParams, setSearchParams] = useSearchParams()
+  const { shareId } = useParams()
   const [showVisualization, setShowVisualization] = useState(true)
   const [uiMode, setUiMode] = useState<UIMode>('ussy')
   const [visualizationMode, setVisualizationMode] = useState<VisualizationMode>('hal')
@@ -42,7 +43,7 @@ const HomePage = () => {
   const lastTriggeredSceneRef = useRef<string | null>(null)
   const dmxBridgeUrl = (import.meta.env.VITE_DMX_BRIDGE_URL as string | undefined)?.trim() || null
 
-  const orchestrator = useChatOrchestrator({ searchParams, setSearchParams })
+  const orchestrator = useChatOrchestrator({ searchParams, setSearchParams, routeShareId: shareId })
   const tutorial = useTutorial({
     getCode: () => orchestrator.getCurrentCode(),
     onLessonLoad: (code) => {
@@ -173,12 +174,12 @@ const HomePage = () => {
 
   const stableTrackActivity = useMemo(() => trackActivity, [trackActivityKey, trackActivity.cycleEnd, trackActivity.cycleStart])
 
-  const { activeLightingGroup, automationStatus } = useDmxAutomation({
+  const { activeLightingGroup, automationStatus, triggerTrack } = useDmxAutomation({
     isPlaying,
     dmxBridgeUrl,
     lighting,
     trackActivity: stableTrackActivity,
-    refreshDmxVisualization,
+    cycleInfo: orchestrator.cycleInfo,
   })
 
   if (isLoadingProject || !currentProject) {
@@ -204,7 +205,16 @@ const HomePage = () => {
 
   const shellProps = {
     topbar: (
-      <ProjectTopbar
+      <div className="space-y-2">
+        {orchestrator.remixNotice ? (
+          <div className="flex flex-col gap-2 rounded-xl border border-cyan-900 bg-cyan-950/30 px-4 py-2 text-xs text-cyan-100 sm:flex-row sm:items-center sm:justify-between">
+            <span>{orchestrator.remixNotice}</span>
+            <button className="self-start text-[10px] uppercase tracking-[0.18em] text-cyan-300 hover:text-cyan-100" onClick={orchestrator.dismissRemixNotice}>
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+        <ProjectTopbar
         projectName={currentProject.name}
         masterVolume={orchestrator.masterVolume}
         customApiEndpoint={orchestrator.customApiEndpoint}
@@ -246,7 +256,11 @@ const HomePage = () => {
         onToggleShortcuts={() => orchestrator.setShowShortcuts(!orchestrator.showShortcuts)}
         onBpmChange={orchestrator.onBpmChange}
         onKeyChange={orchestrator.onProjectKeyChange}
-      />
+        saveStatus={orchestrator.saveError ? 'local-error' : orchestrator.isSaving ? 'saving' : orchestrator.isDirty ? 'unsaved' : 'saved'}
+        pendingPatchCount={pendingPatchCount}
+        shareStatus={orchestrator.shareStatus}
+        />
+      </div>
     ),
     chatPanel: (
       <ChatPanel
@@ -319,6 +333,7 @@ const HomePage = () => {
         onInitStateChange={orchestrator.setEditorInitState}
         onStrudelError={orchestrator.onEditorStrudelError}
         onCodeEvaluated={orchestrator.onEditorCodeEvaluated}
+        onTrackTrigger={(event) => triggerTrack(event.trackName)}
         onSelectSection={orchestrator.onSelectSection}
         onShuffleRhythm={orchestrator.onShuffleRhythm}
         onAddVariation={orchestrator.onAddVariation}

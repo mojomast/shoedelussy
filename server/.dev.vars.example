@@ -11,7 +11,8 @@ OPENROUTER_API_KEY=your-openrouter-api-key-here
 # Other options: anthropic/claude-3.5-sonnet, openai/gpt-4o, etc.
 # OPENROUTER_MODEL=google/gemini-2.5-flash
 
-# Optional: Frontend URL used in share links and OpenRouter headers
+# Optional: Frontend URL used in share links and OpenRouter headers.
+# Production share links should use https://strudel.ussyco.de.
 # APP_URL=http://localhost:5173
 
 # Optional: Bearer token required by /mcp in deployed environments

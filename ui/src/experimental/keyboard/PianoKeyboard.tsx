@@ -142,7 +142,6 @@ export const PianoKeyboard = ({
 
   // Generate black keys
   const blackKeys = []
-  let whiteKeyIndex = 0
   
   for (let i = 0; i < TOTAL_WHITE_KEYS; i++) {
     if (getBlackKeyAfterWhite(i)) {
@@ -205,7 +204,6 @@ export const PianoKeyboard = ({
         </button>
       )
     }
-    whiteKeyIndex++
   }
 
   return (
@@ -220,4 +218,3 @@ export const PianoKeyboard = ({
     </div>
   )
 }
-

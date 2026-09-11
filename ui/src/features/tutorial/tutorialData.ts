@@ -179,7 +179,7 @@ export const chapters: Chapter[] = [
         title: 'Track to Group Bindings',
         concept: 'Bind named `$:` tracks to DMX groups so musical layers can map to lighting groups.',
         instructions: 'Use named tracks and then assign them to DMX groups in the DMX Monitor panel. Runtime group automation currently uses real trigger events plus source-location matching, and can send onset-driven pulses with per-binding intensity and hold time.',
-        scaffold: 'drums $: s("bd hh sd hh")\n\nlead $: note("c4 e4 g4")',
+        scaffold: 'drums$: s("bd hh sd hh")\n\nlead$: note("c4 e4 g4")',
         hints: [
           'Track names come before `$:`.',
           'Named tracks are easier to bind than anonymous tracks.',

@@ -404,7 +404,7 @@ Also note:
 {
   "mcpServers": {
     "shoedelussy": {
-      "url": "https://shoe.ussyco.de/mcp",
+      "url": "https://strudel.ussyco.de/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_MCP_SECRET"
       }
@@ -419,7 +419,7 @@ Also note:
 {
   "mcpServers": {
     "shoedelussy": {
-      "url": "https://shoe.ussyco.de/mcp",
+      "url": "https://strudel.ussyco.de/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_MCP_SECRET"
       }

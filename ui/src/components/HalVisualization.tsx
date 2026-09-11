@@ -182,7 +182,6 @@ const HalVisualization = ({ isPlaying, isListening, audioAnalyser }: HalVisualiz
 
       let bassEnergy = 0
       let midEnergy = 0
-      let highEnergy = 0
       let voiceEnergy = 0
       let isBeat = false
 
@@ -207,11 +206,6 @@ const HalVisualization = ({ isPlaying, isListening, audioAnalyser }: HalVisualiz
           midEnergy += dataArray[i]
         }
         midEnergy /= (midEnd - bassEnd)
-        
-        for (let i = midEnd; i < bufferLength; i++) {
-          highEnergy += dataArray[i]
-        }
-        highEnergy /= (bufferLength - midEnd)
         
         // Beat detection
         const currentEnergy = bassEnergy
@@ -256,7 +250,6 @@ const HalVisualization = ({ isPlaying, isListening, audioAnalyser }: HalVisualiz
       // Normalize energy values
       bassEnergy = bassEnergy / 255
       midEnergy = midEnergy / 255
-      highEnergy = highEnergy / 255
       voiceEnergy = voiceEnergy / 255
 
       // Calculate base size with pulsing

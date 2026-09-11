@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getDmxPostHeaders } from '@/lib/dmxBridge'
 import type { DmxVisualizationData } from './types'
 
 interface DmxVisualizationProps {
@@ -20,9 +21,7 @@ const DmxVisualization = ({ data, bridgeUrl }: DmxVisualizationProps) => {
     try {
       await fetch(`${bridgeUrl}/scenes/apply`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getDmxPostHeaders(),
         body: JSON.stringify({ scene_id: sceneId }),
       })
     } finally {

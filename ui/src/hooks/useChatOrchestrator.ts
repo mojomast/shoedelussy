@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useProjectStore, trimChatHistoryForApi } from '@/stores/projectStore'
 import { api } from '@/lib/api'
 import { buildCodeDiff } from '@/lib/diffUtils'
@@ -11,6 +12,7 @@ import {
   parseBpmFromCode,
   parseKeyFromCode,
   parseTracks,
+  normalizeNamedTrackSyntax,
   updateDetectedParamInCode,
   upsertSetcpsFromBpm,
 } from '@/lib/codeParser'
@@ -22,6 +24,11 @@ import type { CycleInfo } from '@/components/StrudelEditor'
 import type { EditorBridge } from '@/components/EditorPanel'
 
 const normalizeProviderEndpoint = (endpoint: string) => endpoint.trim().replace(/\/+$/g, '')
+
+const normalizeProjectCode = (project: Project): Project => {
+  const strudelCode = normalizeNamedTrackSyntax(project.strudel_code)
+  return strudelCode === project.strudel_code ? project : { ...project, strudel_code: strudelCode }
+}
 
 const formatProviderConfig = (endpoint: string, apiKey: string) => {
   const normalizedEndpoint = normalizeProviderEndpoint(endpoint)
@@ -121,28 +128,59 @@ const isRetryableEmptyResponseError = (error: unknown) => {
   return EMPTY_RESPONSE_PATTERNS.some((pattern) => message.includes(pattern))
 }
 
-const DEFAULT_CODE = `setcps(0.5)
+const DEFAULT_CODE = `setcps(0.56)
 
 // [intro]
-$: note("<c2 eb2 g2 bb2>")
+chords$: note("<c2 eb2 g2 bb2>")
   .s("sawtooth")
   .slow(2)
-  .room(0.2)
-  .gain(0.75)
+  .room(0.25)
+  .gain(0.62)
   .color("purple")
 
-// [drums]
-$: s("bd [~ hh] sd hh")
-  .gain(0.9)
-  .room(0.1)
+floor$: s("hh*4")
+  .gain(0.28)
   .color("cyan")
 
-// [lead]
-$: note("<c4 eb4 g4 bb4>")
+// [drop]
+kick$: s("bd*4")
+  .gain(0.95)
+  .room(0.08)
+  .color("white")
+
+snare$: s("~ sd ~ sd")
+  .gain(0.72)
+  .room(0.12)
+  .color("orange")
+
+lead$: note("<c4 eb4 g4 bb4 c5 bb4 g4 eb4>")
   .s("gm_epiano1")
+  .gain(0.58)
+  .delay(0.25)
+  .color("magenta")
+
+// [breakdown]
+beam$: note("<c3 ~ g3 bb3>")
+  .s("sawtooth")
   .slow(2)
-  .gain(0.65)
-  .color("orange")`
+  .gain(0.5)
+  .lpf(900)
+  .color("blue")`
+
+const DEMO_LIGHTING: LightingProjectState = {
+  cue_bindings: [
+    { section_label: 'intro', scene_id: 'front_warm' },
+    { section_label: 'drop', scene_id: 'club_purple' },
+    { section_label: 'breakdown', scene_id: 'back_blue' },
+  ],
+  group_bindings: [
+    { track_name: 'kick', group_id: 'strobes', intensity: 255, hold_ms: 90, fade_ms: 20 },
+    { track_name: 'snare', group_id: 'front_wash', intensity: 230, hold_ms: 130, fade_ms: 35 },
+    { track_name: 'floor', group_id: 'floor', intensity: 180, hold_ms: 80, fade_ms: 30 },
+    { track_name: 'lead', group_id: 'all_wash', intensity: 170, hold_ms: 160, fade_ms: 60 },
+    { track_name: 'beam', group_id: 'back_beams', intensity: 220, hold_ms: 260, fade_ms: 80 },
+  ],
+}
 
 const EMPTY_CODE = `setcps(0.5)
 
@@ -180,7 +218,7 @@ const createProjectTemplate = (userId: string, template: 'empty' | 'demo' = 'dem
       },
     ],
     versions: [],
-    lighting: { cue_bindings: [], group_bindings: [] },
+    lighting: template === 'demo' ? DEMO_LIGHTING : { cue_bindings: [], group_bindings: [] },
     bpm: parseBpmFromCode(strudelCode),
     key: parseKeyFromCode(strudelCode),
     tags: template === 'demo' ? ['guest', 'demo'] : ['guest', 'empty'],
@@ -192,9 +230,10 @@ const createProjectTemplate = (userId: string, template: 'empty' | 'demo' = 'dem
 interface UseChatOrchestratorArgs {
   searchParams: URLSearchParams
   setSearchParams: (nextInit: URLSearchParams | Record<string, string>) => void
+  routeShareId?: string
 }
 
-export const useChatOrchestrator = ({ searchParams, setSearchParams }: UseChatOrchestratorArgs) => {
+export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareId }: UseChatOrchestratorArgs) => {
   const [isSending, setIsSending] = useState(false)
   const [masterVolume, setMasterVolume] = useState(0.85)
   const [audioAnalyser, setAudioAnalyser] = useState<AnalyserNode | null>(null)
@@ -210,6 +249,8 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams }: UseChatOr
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [shareError, setShareError] = useState<string | null>(null)
   const [isSharing, setIsSharing] = useState(false)
+  const [shareStatus, setShareStatus] = useState<string | null>(null)
+  const [remixNotice, setRemixNotice] = useState<string | null>(null)
   const [lastSharedAt, setLastSharedAt] = useState<string | null>(null)
   const [chatSummary, setChatSummary] = useState<string | null>(null)
   const [approxTokenUsage, setApproxTokenUsage] = useState(0)
@@ -227,6 +268,7 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams }: UseChatOr
   const [isArrangePanelCollapsed, setIsArrangePanelCollapsed] = useState(true)
   const [isFxRackCollapsed, setIsFxRackCollapsed] = useState(true)
   const pendingSendContentsRef = useRef(new Set<string>())
+  const loadedShareIdRef = useRef<string | null>(null)
   const lastStreamUpdateRef = useRef(0)
   const bufferedStreamContentRef = useRef('')
   const flushStreamFrameRef = useRef<number | null>(null)
@@ -258,6 +300,7 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams }: UseChatOr
   } = useProjectStore()
 
   const userId = getOrCreateGuestUserId()
+  const navigate = useNavigate()
   const activeProviderRef = useRef<ReturnType<typeof formatProviderConfig>>(null)
   const customProvider = activeProviderRef.current
 
@@ -417,14 +460,16 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams }: UseChatOr
 
     const localProject = loadLocalProject(nextProjectId)
     if (localProject) {
-      actions.setProject(localProject)
-      setSearchParams({ project: localProject.id })
+      const project = normalizeProjectCode(localProject)
+      actions.setProject(project)
+      saveLocalProject(project)
+      setSearchParams({ project: project.id })
       setIsLoadingProject(false)
       return
     }
 
     try {
-      const remoteProject = await api.getProject(nextProjectId, userId)
+      const remoteProject = normalizeProjectCode(await api.getProject(nextProjectId, userId))
       actions.setProject(remoteProject)
       saveLocalProject(remoteProject)
       setSearchParams({ project: remoteProject.id })
@@ -440,27 +485,41 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams }: UseChatOr
   }, [actions, loadVersions, searchParams, setSearchParams, userId])
 
   useEffect(() => {
-    const shareId = searchParams.get('share')
+    const shareId = routeShareId || searchParams.get('share')
     if (shareId) {
+      if (loadedShareIdRef.current === shareId) return
+      loadedShareIdRef.current = shareId
+
       api.loadSharedCode(shareId).then((data) => {
         const project = createProjectTemplate(userId, 'demo')
         project.id = createId()
-        project.name = 'Shared Session Copy'
-        project.strudel_code = data.code
-        project.bpm = parseBpmFromCode(data.code)
-        project.key = parseKeyFromCode(data.code)
+        project.name = `${data.title || 'Shared Session'} Remix`
+        project.strudel_code = normalizeNamedTrackSyntax(data.code)
+        project.chat_history = [
+          {
+            id: createId(),
+            role: 'system',
+            content: 'Loaded a public read-only share as your own remixable copy. Save or edit it without changing the original share.',
+            timestamp: new Date().toISOString(),
+          },
+        ]
+        project.bpm = parseBpmFromCode(project.strudel_code)
+        project.key = parseKeyFromCode(project.strudel_code)
+        project.tags = ['shared', 'remix']
         actions.setProject(project)
         saveLocalProject(project)
-        setSearchParams({ project: project.id })
+        setRemixNotice(`Remixing ${data.title || 'shared session'}. Your edits will not change the original.`)
+        navigate(`/?project=${project.id}`, { replace: true })
         setIsLoadingProject(false)
       }).catch(() => {
+        loadedShareIdRef.current = null
         void loadProject(null)
       })
       return
     }
 
     void loadProject(null)
-  }, [actions, loadProject, searchParams, setSearchParams, userId])
+  }, [actions, loadProject, navigate, routeShareId, searchParams, setSearchParams, userId])
 
   useEffect(() => {
     if (!currentProject) return
@@ -948,6 +1007,7 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams }: UseChatOr
     setSearchParams({ project: project.id })
     setShareUrl(null)
     setShareError(null)
+    setShareStatus(null)
     setVersionError(null)
   }, [actions, isPlaying, setSearchParams, userId])
 
@@ -955,24 +1015,35 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams }: UseChatOr
     if (!currentProject) return
     setIsSharing(true)
     setShareError(null)
+    setShareStatus('Creating share...')
     try {
-      const response = await api.shareCode(getCurrentCode())
+      const response = await api.shareCode(getCurrentCode(), currentProject.name)
       setShareUrl(response.url)
       setLastSharedAt(new Date().toISOString())
       if (navigator.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(response.url)
+          setShareStatus('Share link copied')
         } catch {
-          // ignore clipboard failures; URL still shown in UI
+          setShareStatus('Share link ready')
         }
+      } else {
+        setShareStatus('Share link ready')
       }
     } catch (error) {
       setShareUrl(null)
       setShareError(error instanceof Error ? error.message : 'Unable to create share link.')
+      setShareStatus('Share failed')
     } finally {
       setIsSharing(false)
     }
   }, [currentProject, getCurrentCode])
+
+  useEffect(() => {
+    if (!shareStatus || shareStatus === 'Creating share...') return
+    const timeout = window.setTimeout(() => setShareStatus(null), 4500)
+    return () => window.clearTimeout(timeout)
+  }, [shareStatus])
 
   const onExportTxt = useCallback(() => {
     if (!currentProject) return
@@ -1198,6 +1269,8 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams }: UseChatOr
     isLoadingModels,
     modelLoadError,
     shareError,
+    shareStatus,
+    remixNotice,
     isSharing,
     lastSharedAt,
     chatSummary,
@@ -1263,6 +1336,7 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams }: UseChatOr
     onEditorStrudelError,
     onEditorCodeEvaluated,
     setShowShortcuts,
+    dismissRemixNotice: () => setRemixNotice(null),
     toggleRhythmGenerator: () => setIsRhythmGeneratorCollapsed((current) => !current),
     toggleArrangePanel: () => setIsArrangePanelCollapsed((current) => !current),
     toggleFxRack: () => setIsFxRackCollapsed((current) => !current),

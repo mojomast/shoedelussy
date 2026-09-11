@@ -35,7 +35,6 @@ export default defineConfig({
   optimizeDeps: {
     // Pre-bundle Strudel packages
     include: [
-      '@strudel/web',
       '@strudel/codemirror',
     ],
   },

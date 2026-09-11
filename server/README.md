@@ -46,6 +46,8 @@ OPENROUTER_MODEL=google/gemini-2.5-flash
 APP_URL=http://localhost:5173
 ```
 
+Production should use `APP_URL=https://strudel.ussyco.de`. The share API canonicalizes missing/local app URLs to `https://strudel.ussyco.de`, while CORS accepts both `strudel.ussyco.de` and the `shoe.ussyco.de` alias.
+
 `server/wrangler.toml` also needs KV bindings for:
 
 - `SHARES_KV`

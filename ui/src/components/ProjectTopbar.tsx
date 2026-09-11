@@ -16,7 +16,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { SavedPromptPreset, SystemPromptMode } from '@/types/project'
 import type { VisualizationMode } from '@/components/visualization/types'
-import { Disc3, Settings, HelpCircle } from 'lucide-react'
+import { Disc3, Settings, HelpCircle, FolderKanban } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 
 // ── Constants ────────────────────────────────────────────────────
@@ -69,6 +70,9 @@ interface ProjectTopbarProps {
   onToggleShortcuts: () => void
   onBpmChange?: (bpm: number) => void
   onKeyChange?: (key: string) => void
+  saveStatus?: 'saving' | 'unsaved' | 'saved' | 'local-error'
+  pendingPatchCount?: number
+  shareStatus?: string | null
 }
 
 // ── Shared input class ───────────────────────────────────────────
@@ -142,6 +146,9 @@ const ProjectTopbar = ({
   onToggleShortcuts,
   onBpmChange,
   onKeyChange,
+  saveStatus = 'saved',
+  pendingPatchCount = 0,
+  shareStatus,
 }: ProjectTopbarProps) => {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<DrawerTab>('ai')
@@ -202,6 +209,25 @@ const ProjectTopbar = ({
           className={`${inputClass} w-40 min-w-[100px] font-semibold`}
           aria-label="Project name"
         />
+
+        <span
+          className={`hidden shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium sm:inline-flex ${saveStatus === 'local-error' ? 'bg-amber-950/70 text-amber-200' : saveStatus === 'unsaved' ? 'bg-purple-950/70 text-purple-200' : saveStatus === 'saving' ? 'bg-cyan-950/70 text-cyan-200' : 'bg-emerald-950/60 text-emerald-200'}`}
+          title={saveStatus === 'local-error' ? 'Remote save failed, local copy is preserved' : undefined}
+        >
+          {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'unsaved' ? 'Unsaved' : saveStatus === 'local-error' ? 'Local save' : 'Saved'}
+        </span>
+
+        {pendingPatchCount > 0 ? (
+          <span className="hidden shrink-0 rounded-md bg-fuchsia-950/70 px-2 py-0.5 text-[10px] font-medium text-fuchsia-200 md:inline-flex">
+            {pendingPatchCount} patch{pendingPatchCount === 1 ? '' : 'es'}
+          </span>
+        ) : null}
+
+        {shareStatus ? (
+          <span className="hidden shrink-0 rounded-md bg-cyan-950/70 px-2 py-0.5 text-[10px] font-medium text-cyan-200 lg:inline-flex">
+            {shareStatus}
+          </span>
+        ) : null}
 
         {/* 4. BPM input */}
         <input
@@ -526,6 +552,17 @@ const ProjectTopbar = ({
                   onClick={onLoadDemo}
                 >
                   Load Demo
+                </Button>
+                <Button
+                  asChild
+                  size="toolbar"
+                  variant="outline"
+                  className="border-[var(--ussy-divider)] bg-transparent text-[var(--ussy-text)] hover:bg-[var(--ussy-surface-2)]"
+                >
+                  <Link to="/projects">
+                    <FolderKanban className="mr-1.5 h-3.5 w-3.5" />
+                    Projects
+                  </Link>
                 </Button>
 
                 <div className="h-4 w-px bg-[var(--ussy-divider)]" />

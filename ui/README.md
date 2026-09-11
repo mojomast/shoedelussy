@@ -91,7 +91,7 @@ VITE_API_URL=http://localhost:8788
 - The `[` and `]` shortcuts are guarded against firing in text inputs, textareas, selects, and contenteditable elements (including CodeMirror's editor).
 - The editor remains the upstream toaster Strudel editor; it was extended rather than replaced.
 - `pnpm preview` is only the local Vite production preview, not the production hosting path.
-- Public `shoe.ussyco.de` hosting should use a production build, not the Vite dev server.
+- Public `strudel.ussyco.de` hosting should use a production build, not the Vite dev server. `shoe.ussyco.de` can be served as an alias, but copied share links should remain canonical on `strudel.ussyco.de`.
 - The DAW shell is intentionally designed around panel-local scrolling rather than document-level page scrolling.
 - Chat requests default to `google/gemini-2.5-flash`, but users can provide a custom endpoint + API key override in the settings drawer.
 - When a custom provider is configured, clicking `Load Models` populates the model selector from that provider's `/models` API.

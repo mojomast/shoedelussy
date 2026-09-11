@@ -79,6 +79,7 @@ scripts/*
 !scripts/public_proxy.py
 !scripts/live_sync.sh
 !scripts/deploy-live.sh
+!scripts/dmx_demo_site.py
 server/src/lib/strudel-samples/*
 server/wrangler.toml
 newprompt.md
