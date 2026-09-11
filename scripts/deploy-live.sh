@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_ROOT="${1:-/home/mojo/projects/strudelussy-live}"
 LOCKFILE="/tmp/shoedelussy-deploy-live.lock"
+export LIVE_WORKER_PORT="${LIVE_WORKER_PORT:-8790}"
 
 exec 9>"${LOCKFILE}"
 flock -n 9 || exit 0

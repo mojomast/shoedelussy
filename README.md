@@ -104,7 +104,7 @@ Public runtime on the maintainer machine currently uses:
 
 - `https://strudel.ussyco.de` for the app
 - `https://dmxdemo.ussyco.de` for a fake bridge-compatible DMX lighting rig
-- a local path-aware proxy that serves the built SPA and forwards `/api/*` to the worker on `:8788`
+- a local path-aware proxy that serves the built SPA and forwards `/api/*` to the worker on `:8788` (`LIVE_WORKER_PORT` overrides this; the live scripts default to `:8790`)
 - `scripts/dmx_demo_site.py` on `127.0.0.1:9512`, proxied publicly by the `dmxdemo` webring subdomain
 - live build scripts default `VITE_DMX_BRIDGE_URL` to `https://dmxdemo.ussyco.de` unless overridden
 

@@ -13,7 +13,8 @@ from urllib.parse import urlsplit
 
 HOST = "127.0.0.1"
 PORT = 9511
-API_BASE = "http://127.0.0.1:8788"
+WORKER_PORT = os.environ.get("LIVE_WORKER_PORT", "8788")
+API_BASE = f"http://127.0.0.1:{WORKER_PORT}"
 DIST_DIR = str(Path(__file__).resolve().parents[1] / "ui" / "dist")
 
 
