@@ -90,10 +90,9 @@ projectsRoute.put('/:id', async (c) => {
   if (typeof userId !== 'string') return userId
 
   const projectId = c.req.param('id')
+  // Upsert: the UI uses PUT for any project referenced in the URL, including
+  // guest projects that have not been persisted to the server yet.
   const existing = await getProjectRecord(c.env, userId, projectId)
-  if (!existing) {
-    return c.json({ error: 'Project not found' }, 404)
-  }
 
   const body = await readJson<Partial<ProjectRecord>>(c)
   if (!body) {
@@ -105,17 +104,17 @@ projectsRoute.put('/:id', async (c) => {
   const project: ProjectRecord = {
     id: projectId,
     user_id: userId,
-    name: body.name?.trim() || existing.name || 'Untitled Project',
-    description: body.description ?? existing.description,
-    strudel_code: body.strudel_code ?? existing.strudel_code ?? '',
-    chat_history: body.chat_history ?? existing.chat_history ?? [],
-    versions: body.versions ?? existing.versions ?? [],
-    lighting: body.lighting ?? existing.lighting,
-    bpm: body.bpm ?? existing.bpm,
-    key: body.key ?? existing.key,
-    tags: body.tags ?? existing.tags ?? [],
-    is_public: body.is_public ?? existing.is_public ?? false,
-    created_at: existing.created_at || now,
+    name: body.name?.trim() || existing?.name || 'Untitled Project',
+    description: body.description ?? existing?.description,
+    strudel_code: body.strudel_code ?? existing?.strudel_code ?? '',
+    chat_history: body.chat_history ?? existing?.chat_history ?? [],
+    versions: body.versions ?? existing?.versions ?? [],
+    lighting: body.lighting ?? existing?.lighting,
+    bpm: body.bpm ?? existing?.bpm,
+    key: body.key ?? existing?.key,
+    tags: body.tags ?? existing?.tags ?? [],
+    is_public: body.is_public ?? existing?.is_public ?? false,
+    created_at: existing?.created_at || now,
     updated_at: now,
   }
 

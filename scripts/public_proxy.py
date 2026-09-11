@@ -16,6 +16,9 @@ PORT = 9511
 WORKER_PORT = os.environ.get("LIVE_WORKER_PORT", "8788")
 API_BASE = f"http://127.0.0.1:{WORKER_PORT}"
 DIST_DIR = str(Path(__file__).resolve().parents[1] / "ui" / "dist")
+# LLM calls can take a while before the first byte; keep this generous.
+UPSTREAM_TIMEOUT = float(os.environ.get("LIVE_PROXY_TIMEOUT", "120"))
+SSE_IDLE_SELECT = 10.0
 
 
 class PublicProxyHandler(SimpleHTTPRequestHandler):
@@ -62,9 +65,11 @@ class PublicProxyHandler(SimpleHTTPRequestHandler):
         self._proxy_request()
 
     def _proxy_request(self):
+        headers_sent = False
+        connection = None
         try:
             target = urlsplit(API_BASE)
-            connection = http.client.HTTPConnection(target.hostname, target.port, timeout=10)
+            connection = http.client.HTTPConnection(target.hostname, target.port, timeout=UPSTREAM_TIMEOUT)
 
             content_length = int(self.headers.get("Content-Length", "0"))
             body = self.rfile.read(content_length) if content_length else None
@@ -86,6 +91,7 @@ class PublicProxyHandler(SimpleHTTPRequestHandler):
             if is_sse:
                 self.send_header("Cache-Control", "no-cache")
             self.end_headers()
+            headers_sent = True
 
             if self.command == "HEAD":
                 return
@@ -93,7 +99,7 @@ class PublicProxyHandler(SimpleHTTPRequestHandler):
             if is_sse:
                 self.close_connection = False
                 while True:
-                    ready, _, _ = select.select([response.fp], [], [], 15)
+                    ready, _, _ = select.select([response.fp], [], [], SSE_IDLE_SELECT)
                     if not ready:
                         self.wfile.write(b": proxy-keepalive\n\n")
                         self.wfile.flush()
@@ -109,6 +115,12 @@ class PublicProxyHandler(SimpleHTTPRequestHandler):
             payload = response.read()
             self.wfile.write(payload)
         except (ConnectionRefusedError, http.client.HTTPException, OSError, SocketTimeout):
+            # If the response already started streaming, we cannot send a new
+            # status line; just drop the connection so the client retries.
+            if headers_sent:
+                self.close_connection = True
+                return
+
             payload = b'{"error":"upstream unavailable"}'
             self.send_response(502)
             self.send_header("Content-Type", "application/json")
@@ -117,6 +129,12 @@ class PublicProxyHandler(SimpleHTTPRequestHandler):
 
             if self.command != "HEAD":
                 self.wfile.write(payload)
+        finally:
+            if connection is not None:
+                try:
+                    connection.close()
+                except Exception:
+                    pass
 
 
 if __name__ == "__main__":

@@ -306,9 +306,12 @@ chatRoute.post('/', async (c) => {
     c.header('X-Accel-Buffering', 'no')
 
     return streamText(c, async (stream) => {
+      // Flush an initial comment immediately so the client and any intermediate
+      // proxy see activity before the model produces its first token.
+      await stream.write(': connected\n\n')
       const heartbeatId = setInterval(() => {
         void stream.write(': keep-alive\n\n')
-      }, 15000)
+      }, 10000)
 
       try {
         const completion = await openai.chat.completions.create({
