@@ -21,6 +21,10 @@ pnpm install --dir "${REPO_ROOT}/server" --frozen-lockfile
 pkill -f "${REPO_ROOT}/scripts/public_proxy.py" || true
 pkill -f "${REPO_ROOT}/scripts/run_worker.sh" || true
 pkill -f "${REPO_ROOT}/scripts/dmx_demo_site.py" || true
+# run_worker.sh's wrangler/workerd children can outlive the shell and keep the
+# worker port bound, so kill them explicitly before restarting.
+pkill -f "${REPO_ROOT}/server/node_modules" || true
+pkill -f "wrangler dev .*--port ${LIVE_WORKER_PORT}" || true
 
 # Do not let background child processes inherit the deploy lock fd.
 exec 9>&-
