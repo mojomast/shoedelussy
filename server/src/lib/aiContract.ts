@@ -236,6 +236,74 @@ const contractFailure = (message: string): AIResponseContract => ({
   has_code_change: false,
 })
 
+// Lightweight structural check. Mini-notation and other content inside string
+// literals is ignored so `s("bd(3,8)")` and `note("<c e g>")` are not flagged.
+const findDelimiterIssue = (code: string): string | null => {
+  const stack: string[] = []
+  let inString: string | null = null
+  let isEscaped = false
+  let inLineComment = false
+  let inBlockComment = false
+
+  for (let index = 0; index < code.length; index += 1) {
+    const char = code[index]
+    const next = code[index + 1]
+
+    if (inLineComment) {
+      if (char === '\n') inLineComment = false
+      continue
+    }
+    if (inBlockComment) {
+      if (char === '*' && next === '/') {
+        inBlockComment = false
+        index += 1
+      }
+      continue
+    }
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false
+        continue
+      }
+      if (char === '\\') {
+        isEscaped = true
+        continue
+      }
+      if (char === inString) inString = null
+      continue
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      inString = char
+      continue
+    }
+    if (char === '/' && next === '/') {
+      inLineComment = true
+      index += 1
+      continue
+    }
+    if (char === '/' && next === '*') {
+      inBlockComment = true
+      index += 1
+      continue
+    }
+    if (char === '(' || char === '[' || char === '{') {
+      stack.push(char)
+      continue
+    }
+    if (char === ')' || char === ']' || char === '}') {
+      const expected = char === ')' ? '(' : char === ']' ? '[' : '{'
+      if (stack.pop() !== expected) {
+        return `unbalanced \`${char}\``
+      }
+    }
+  }
+
+  if (inString) return 'an unclosed string literal'
+  if (stack.length > 0) return `unclosed \`${stack[stack.length - 1]}\``
+  return null
+}
+
 export const sanitizeStrudelCode = (input: string): SanitizedCodeResult => {
   let code = normalizeNewlines(stripMarkdownFences(input)).trim()
   const substitutions: string[] = []
@@ -269,6 +337,11 @@ export const sanitizeStrudelCode = (input: string): SanitizedCodeResult => {
 
   if (EMPTY_PATTERN_CALL_PATTERN.test(code)) {
     blockingIssues.push('Empty mini-notation like `s("")` is invalid. Use `~` inside a real pattern or a supported probability transform instead.')
+  }
+
+  const delimiterIssue = findDelimiterIssue(code)
+  if (delimiterIssue) {
+    blockingIssues.push(`Generated code looks syntactically broken (${delimiterIssue}). Return the full, valid Strudel code.`)
   }
 
   if (/\bawait\s+/.test(code)) {
@@ -331,6 +404,57 @@ export type ChatJsonParseResult =
   | { ok: true; response: AIResponseContract }
   | { ok: false; message: string }
 
+// Escape literal newlines/tabs that appear inside JSON strings, a very common
+// LLM failure when embedding multi-line Strudel code.
+const escapeControlCharsInStrings = (value: string): string => {
+  let out = ''
+  let inString = false
+  let isEscaped = false
+  for (const char of value) {
+    if (inString) {
+      if (isEscaped) {
+        out += char
+        isEscaped = false
+        continue
+      }
+      if (char === '\\') {
+        out += char
+        isEscaped = true
+        continue
+      }
+      if (char === '"') {
+        out += char
+        inString = false
+        continue
+      }
+      if (char === '\n') {
+        out += '\\n'
+        continue
+      }
+      if (char === '\r') {
+        out += '\\r'
+        continue
+      }
+      if (char === '\t') {
+        out += '\\t'
+        continue
+      }
+      out += char
+      continue
+    }
+    out += char
+    if (char === '"') inString = true
+  }
+  return out
+}
+
+// Best-effort repair of common LLM JSON mistakes so a near-miss can still
+// become a usable patch instead of a hard failure.
+const repairJsonText = (value: string): string => value
+  .replace(/[\u201C\u201D]/g, '"')
+  .replace(/[\u2018\u2019]/g, "'")
+  .replace(/,\s*(?=[}\]])/g, '')
+
 // Distinguishes a genuine "no change needed" reply (ok:true) from a contract
 // violation (ok:false) so callers can retry or surface errors explicitly.
 export const parseChatJsonResponseSafe = (content: string, currentCode: string): ChatJsonParseResult => {
@@ -347,7 +471,12 @@ export const parseChatJsonResponseSafe = (content: string, currentCode: string):
   try {
     parsed = JSON.parse(jsonCandidate)
   } catch {
-    return { ok: false, message: 'The model returned malformed JSON. Ask again with a smaller, more specific request.' }
+    const repairedCandidate = escapeControlCharsInStrings(repairJsonText(jsonCandidate))
+    try {
+      parsed = JSON.parse(repairedCandidate)
+    } catch {
+      return { ok: false, message: 'The model returned malformed JSON. Ask again with a smaller, more specific request.' }
+    }
   }
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {

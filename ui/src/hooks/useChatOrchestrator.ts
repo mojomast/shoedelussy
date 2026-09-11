@@ -717,8 +717,14 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
     const messagesForApi = nextSummary
       ? [{ role: 'system' as const, content: nextSummary }, ...trimmedMessages]
       : trimmedMessages
+    // Only send a custom prompt when the user actually customized it; the
+    // default template is redundant with the server's base prompt.
+    const trimmedCustomPrompt = customSystemPrompt.trim()
+    const effectiveCustomPrompt = trimmedCustomPrompt && trimmedCustomPrompt !== DEFAULT_CUSTOM_PROMPT_TEMPLATE.trim()
+      ? trimmedCustomPrompt
+      : undefined
     const nextApproxTokenUsage = estimateTokens(currentCode)
-      + estimateTokens(customSystemPrompt)
+      + estimateTokens(effectiveCustomPrompt ?? '')
       + (nextSummary ? estimateTokens(nextSummary) : 0)
       + messagesForApi.reduce((sum, message) => sum + estimateTokens(message.content), 0)
     setApproxTokenUsage(nextApproxTokenUsage)
@@ -728,7 +734,7 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
       current_code: currentCode,
       model: selectedModel,
       system_prompt_mode: systemPromptMode,
-      custom_system_prompt: customSystemPrompt.trim() || undefined,
+      custom_system_prompt: effectiveCustomPrompt,
       provider: customProvider ?? undefined,
       project_meta: {
         bpm: currentProject.bpm,
@@ -742,7 +748,12 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
     const abortController = new AbortController()
     activeChatAbortRef.current = abortController
 
-    const runChatOnce = async () => api.chatStream(payload, userId, {
+    const runChatOnce = async (correction?: string) => api.chatStream(
+      correction
+        ? { ...payload, messages: [...payload.messages, { role: 'user' as const, content: correction }] }
+        : payload,
+      userId,
+      {
       signal: abortController.signal,
       onChunk: (chunk) => {
         setChatStatus('Streaming response...')
@@ -834,7 +845,11 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
               message.id === streamingAssistantId ? { ...message, content: '' } : message,
             )
             actions.setChatMessages(resetMessages)
-            continue
+            await runChatOnce(
+              'Your previous reply did not match the required JSON contract. Reply again with ONLY the JSON object '
+              + '(message, code, diff_summary, has_code_change) and, if code changes, the FULL updated code with newlines escaped as \\n.',
+            )
+            break
           }
 
           throw error

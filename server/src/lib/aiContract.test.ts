@@ -144,6 +144,28 @@ describe('sanitizeStrudelCode', () => {
     expect(sanitized.blockingIssue).toMatch(/unsupported drum bank/i)
   })
 
+  it('flags unbalanced delimiters', () => {
+    const sanitized = sanitizeStrudelCode('setcps(0.5)\n$: s("bd sd"')
+    expect(sanitized.blockingIssue).toMatch(/syntactically broken/i)
+  })
+
+  it('does not flag balanced mini-notation brackets inside strings', () => {
+    const sanitized = sanitizeStrudelCode('setcps(0.5)\n$: s("bd(3,8) [sd [~ hh]]")')
+    expect(sanitized.blockingIssue).toBeNull()
+  })
+
+  it('recovers JSON with a literal newline inside a string value', () => {
+    const content = '{"message":"Added drums.","code":"setcps(0.5)\n$: s(\\"bd sd\\")","diff_summary":"x","has_code_change":true}'
+    const result = parseChatJsonResponseSafe(content, 'setcps(0.5)')
+    expect(result.ok).toBe(true)
+  })
+
+  it('recovers JSON with a trailing comma', () => {
+    const content = '{"message":"ok","code":"","diff_summary":"","has_code_change":false,}'
+    const result = parseChatJsonResponseSafe(content, 'setcps(0.5)')
+    expect(result.ok).toBe(true)
+  })
+
   it('blocks no-op sometimesBy transforms', () => {
     const sanitized = sanitizeStrudelCode('setcps(0.5)\n$: s("blong_is_a_kitty_cat").sometimesBy(0.1, x => x)')
     expect(sanitized.blockingIssue).toBeNull()

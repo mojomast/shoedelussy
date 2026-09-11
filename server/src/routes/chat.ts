@@ -173,7 +173,16 @@ Strict formatting rules:
 - Do NOT return null for any field.
 - When no code change is needed, set "code" to "", "diff_summary" to "", and "has_code_change" to false.
 - When a code change is needed, "code" MUST contain the FULL updated Strudel code for the project.
-- The JSON must parse with standard JSON.parse without repairs.
+- "diff_summary" should say what changed and where, e.g. "Added an offbeat closed hat and tightened the kick."
+- The JSON must parse with standard JSON.parse without repairs. Escape newlines in "code" as \\n.
+
+EXAMPLE RESPONSES
+
+No change needed:
+{"message":"That already sounds good; I left it unchanged and suggested one option.","code":"","diff_summary":"","has_code_change":false}
+
+With a change:
+{"message":"Added a syncopated closed hat and a snare backbeat.","code":"setcps(0.5)\\n$: s(\\"bd ~ bd ~\\")\\nsnare$: s(\\"~ sd ~ sd\\")\\nhat$: s(\\"hh*8\\").gain(0.5)","diff_summary":"Added a snare backbeat and offbeat hats while keeping the kick.","has_code_change":true}
 
 CURRENT CONTEXT
 
@@ -189,6 +198,7 @@ ${payload.current_code}
 ${CODE_BLOCK_END}
 
 Use the conversation history plus this code to understand what the user is iterating on.
+Earlier assistant turns may appear as plain text for readability; ALWAYS reply with the JSON object regardless.
 Make SMALL, incremental edits on top of the existing code.
 Only rewrite the entire pattern or project structure when the user explicitly asks for a full rewrite.
 
