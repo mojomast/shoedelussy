@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL = 'google/gemini-2.5-flash'
+export const DEFAULT_CHAT_MODEL = 'deepseek/deepseek-v4.1-flash'
 export const DEFAULT_SYSTEM_PROMPT_MODE = 'shoedelussy'
 
 export type ChatModel = string

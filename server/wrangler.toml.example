@@ -6,8 +6,13 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 # Environment variables
 APP_URL = "https://strudel.ussyco.de"
-OPENROUTER_MODEL = "google/gemini-2.5-flash"
+# Default LLM provider (OpenAI-compatible). Set LLM_API_KEY as a secret, not here.
+LLM_BASE_URL = "https://router.requesty.ai/v1"
+LLM_MODEL = "deepseek/deepseek-v4.1-flash"
 MCP_SECRET = ""
+
+# Legacy OpenRouter configuration (used when LLM_* vars are unset)
+# OPENROUTER_MODEL = "google/gemini-2.5-flash"
 
 # KV namespace for sharing patterns
 # Run: wrangler kv:namespace create "SHARES_KV" to get these IDs

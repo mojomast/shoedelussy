@@ -128,8 +128,10 @@ VITE_DMX_BRIDGE_URL=https://dmxdemo.ussyco.de
 Backend `server/.dev.vars`:
 
 ```bash
-OPENROUTER_API_KEY=...
-OPENROUTER_MODEL=google/gemini-2.5-flash
+# Default LLM provider (OpenAI-compatible). Example uses Requesty.
+LLM_BASE_URL=https://router.requesty.ai/v1
+LLM_API_KEY=...
+LLM_MODEL=deepseek/deepseek-v4.1-flash
 APP_URL=http://localhost:5173
 ```
 

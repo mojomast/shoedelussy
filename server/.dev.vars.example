@@ -2,13 +2,21 @@
 # Copy this file to .dev.vars and fill in your actual values
 # .dev.vars is gitignored and used by wrangler for local development
 
-# OpenRouter API Key (required)
-# Get your key from: https://openrouter.ai/
-OPENROUTER_API_KEY=your-openrouter-api-key-here
+# Default LLM provider. Point LLM_BASE_URL at any OpenAI-compatible endpoint.
+# Defaults to OpenRouter when LLM_BASE_URL is unset.
+# Example (Requesty): LLM_BASE_URL=https://router.requesty.ai/v1
+# LLM_BASE_URL=https://router.requesty.ai/v1
 
-# Optional: Specify which model to use
-# Default: google/gemini-2.5-flash
-# Other options: anthropic/claude-3.5-sonnet, openai/gpt-4o, etc.
+# API key for the default provider (required).
+# LLM_API_KEY=rqsty-sk-...
+LLM_API_KEY=your-api-key-here
+
+# Model ID served by the default provider.
+# LLM_MODEL=deepseek/deepseek-v4.1-flash
+LLM_MODEL=deepseek/deepseek-v4.1-flash
+
+# Legacy OpenRouter configuration (used when LLM_* vars are unset)
+# OPENROUTER_API_KEY=your-openrouter-api-key-here
 # OPENROUTER_MODEL=google/gemini-2.5-flash
 
 # Optional: Frontend URL used in share links and OpenRouter headers.

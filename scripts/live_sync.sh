@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="${1:-/home/mojo/projects/shoedelussy-live}"
+REPO_ROOT="${1:-/home/mojo/projects/strudelussy-live}"
 LOCKFILE="/tmp/shoedelussy-live-sync.lock"
 
 exec 9>"${LOCKFILE}"

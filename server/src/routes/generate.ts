@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import OpenAI from 'openai'
 import type { Env } from '../index'
+import { getDefaultLlmConfig } from '../lib/llm'
 import { STRUDEL_DOCS } from '../lib/strudel-docs/index.js'
 import { validateGeneratedCode } from '../lib/aiContract'
 
@@ -63,14 +64,8 @@ const generateStrudelCode = async (
   currentPattern: string | undefined, 
   env: Env
 ): Promise<string> => { 
-  const openai = new OpenAI({
-    baseURL: 'https://openrouter.ai/api/v1',
-    apiKey: env.OPENROUTER_API_KEY,
-    defaultHeaders: {
-      'HTTP-Referer': env.APP_URL || 'https://voloblack.com/toaster',
-      'X-Title': 'Toaster Music Generator',
-    }
-  })
+  const { baseURL, apiKey, defaultHeaders, model } = getDefaultLlmConfig(env)
+  const openai = new OpenAI({ baseURL, apiKey, defaultHeaders })
 
   const systemPrompt = `You are an expert Strudel live coding assistant.
 Return valid Strudel code only.
@@ -121,7 +116,7 @@ Only return raw Strudel code, no explanations or markdown.`
   }
 
     const completion = await openai.chat.completions.create({
-    model: env.OPENROUTER_MODEL || 'google/gemini-2.5-flash',
+    model,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userMessage }

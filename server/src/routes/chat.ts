@@ -4,6 +4,7 @@ import OpenAI from 'openai'
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 import type { Env } from '../index'
 import { parseChatJsonResponse, unsupportedSoundNames, VERIFIED_BANK_VOICES } from '../lib/aiContract'
+import { getDefaultLlmConfig } from '../lib/llm'
 import { STRUDEL_DOCS } from '../lib/strudel-docs'
 
 const ALLOWED_MODELS = [
@@ -58,14 +59,8 @@ const getClientOptions = (env: Env, provider?: ChatProviderOverride) => {
     }
   }
 
-  return {
-    baseURL: 'https://openrouter.ai/api/v1',
-    apiKey: env.OPENROUTER_API_KEY,
-    defaultHeaders: {
-      'HTTP-Referer': env.APP_URL || 'http://localhost:5173',
-      'X-Title': 'shoedelussy chat',
-    },
-  }
+  const { baseURL, apiKey, defaultHeaders } = getDefaultLlmConfig(env)
+  return { baseURL, apiKey, defaultHeaders }
 }
 
 const getSelectedModel = (env: Env, payload: ChatPayload): string => {
@@ -76,9 +71,13 @@ const getSelectedModel = (env: Env, payload: ChatPayload): string => {
     return payload.model
   }
 
+  // A deployment-configured model is authoritative for the hosted provider;
+  // users who want other models supply their own endpoint + key.
+  if (env.LLM_MODEL?.trim()) return env.LLM_MODEL.trim()
+
   return (ALLOWED_MODELS.includes((payload.model || '') as (typeof ALLOWED_MODELS)[number])
     ? payload.model
-    : env.OPENROUTER_MODEL || 'google/gemini-2.5-flash') as (typeof ALLOWED_MODELS)[number] | string
+    : getDefaultLlmConfig(env).model) as (typeof ALLOWED_MODELS)[number] | string
 }
 
 chatRoute.post('/models', async (c) => {

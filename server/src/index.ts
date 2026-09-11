@@ -8,8 +8,12 @@ import { buildMcpHandler } from './routes/mcp'
 import { setEnvContext, isDevelopment } from './lib/env'
 
 export type Env = {
-  // OpenRouter configuration
-  OPENROUTER_API_KEY: string
+  // Default LLM provider configuration (OpenAI-compatible). Falls back to OpenRouter.
+  LLM_BASE_URL?: string
+  LLM_API_KEY?: string
+  LLM_MODEL?: string
+  // Legacy OpenRouter configuration (still honored when LLM_* is unset)
+  OPENROUTER_API_KEY?: string
   OPENROUTER_MODEL?: string
   APP_URL?: string
   MCP_SECRET?: string

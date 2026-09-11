@@ -41,10 +41,14 @@ pnpm dev
 `server/.dev.vars`:
 
 ```bash
-OPENROUTER_API_KEY=...
-OPENROUTER_MODEL=google/gemini-2.5-flash
+# Default LLM provider (OpenAI-compatible). Example uses Requesty.
+LLM_BASE_URL=https://router.requesty.ai/v1
+LLM_API_KEY=...
+LLM_MODEL=deepseek/deepseek-v4.1-flash
 APP_URL=http://localhost:5173
 ```
+
+`LLM_*` vars take precedence; the legacy `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` vars are still honored as a fallback when they are unset.
 
 Production should use `APP_URL=https://strudel.ussyco.de`. The share API canonicalizes missing/local app URLs to `https://strudel.ussyco.de`, while CORS accepts both `strudel.ussyco.de` and the `shoe.ussyco.de` alias.
 
@@ -67,8 +71,8 @@ pnpm exec tsc --noEmit
 - The chat route streams incremental chunks and then ends with the existing structured `AIResponse` payload.
 - The chat route now enforces a strict response contract with four required JSON fields: `message`, `code`, `diff_summary`, and `has_code_change`.
 - The chat route degrades safely when the upstream model returns non-JSON text, malformed JSON, or schema-invalid JSON instead of the requested structured payload.
-- The server currently uses `OPENROUTER_MODEL` or falls back to `google/gemini-2.5-flash`.
-- The chat route defaults to `google/gemini-2.5-flash`, but it also proxies custom endpoint + API key overrides from the UI.
+- The server resolves its default model from `LLM_MODEL` (falling back to `OPENROUTER_MODEL`, then `google/gemini-2.5-flash`) and its default provider from `LLM_BASE_URL` (falling back to OpenRouter).
+- The chat route also proxies custom endpoint + API key overrides from the UI.
 - `POST /api/chat/models` loads available model ids from a custom provider's `/models` endpoint so the UI can populate its selector dynamically.
 - The chat route supports two prompt modes: `legacy-toaster` for a lighter baseline and `shoedelussy` for stricter JSON/schema adherence and safer Strudel-only edits.
 - The chat route can also append a user-authored custom system prompt override on top of the selected base prompt.
@@ -76,7 +80,7 @@ pnpm exec tsc --noEmit
 - `src/lib/strudel-docs/10-full-song-examples.ts` is currently a placeholder and is intentionally not imported into the combined `STRUDEL_DOCS` export.
 - Only the last 20 non-system chat messages are forwarded to the LLM on each request.
 - The shared AI contract helper now parses balanced JSON more defensively, rejects unsupported methods and one-argument `.sometimesBy()` usage, removes stray `await`, replaces unsupported sound names like `chirp`, remaps invalid bank+voice combos to safe fallbacks, auto-repairs known broken rare-event sample patterns into explicit `~`-based mini-notation, rejects unsupported banks, rejects oversized generated code, and prevents false-positive `has_code_change` responses when the code is unchanged.
-- `POST /api/generate` now shares the same Strudel validator, unwraps accidental JSON envelopes or markdown fences, rejects unchanged fix attempts, and uses `OPENROUTER_MODEL` instead of a deprecated hardcoded preview model.
+- `POST /api/generate` now shares the same Strudel validator, unwraps accidental JSON envelopes or markdown fences, rejects unchanged fix attempts, and uses the configured default model instead of a deprecated hardcoded preview model.
 - The chat SSE route emits keepalive comments so long-running generations are less likely to stall behind intermediate proxies.
 - Firebase auth and Supabase are still planned follow-up work from the full spec.
 - For live-hosting disclosure, the public source and license notice are documented in `../docs/STRUDEL_SOURCE_DISCLOSURE.md` and linked from the UI.
