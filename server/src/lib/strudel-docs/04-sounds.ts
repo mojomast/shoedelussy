@@ -10,7 +10,7 @@ s("bd sd hh cp")      // 's' is shorthand for 'sound'
 
 #### Drums
 - Classic: bd, sd, hh, oh, cp, rim, cr, rd, ht, mt, lt
-- Banks: .bank("RolandTR808|RolandTR909|mc303|OberheimDMX") - see Section 14 for all 100+ drum machines
+- Banks: .bank("RolandTR808"), .bank("RolandTR909"), .bank("RolandTR707"), .bank("OberheimDMX"), .bank("AkaiMPC60") - 70+ vintage machines are preloaded (see Section 14); bank names are case-insensitive
 - Select variations: .n("0 1 2 3")
 
 #### Bass Sounds

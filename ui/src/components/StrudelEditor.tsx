@@ -270,7 +270,9 @@ const StrudelEditor = forwardRef<StrudelEditorHandle, StrudelEditorProps>(({ ini
               const ds = "https://raw.githubusercontent.com/felixroos/dough-samples/main/"
               const ts = "https://raw.githubusercontent.com/todepond/samples/main/"
               
-              await Promise.all([
+              // Load each pack independently: one dead URL must not block the
+              // whole editor from initializing.
+              const sampleLoadResults = await Promise.allSettled([
                 registerSynthSounds(), 
                 registerSoundfonts(),
                 registerZZFXSounds(),
@@ -367,11 +369,25 @@ const StrudelEditor = forwardRef<StrudelEditorHandle, StrudelEditorProps>(({ ini
                 // GitHub sample packs
                 samples('github:tidalcycles/dirt-samples', undefined, { prebake: true }),
                 samples('github:yaxu/clean-breaks', undefined, { prebake: true }),
+
+                // Additional community packs (loaded lazily on first use)
+                samples('bubo:fox'),
+                samples('bubo:amen'),
+                samples('github:switchangel/pad'),
               ])
-              
+
+              for (const result of sampleLoadResults) {
+                if (result.status === 'rejected') {
+                  console.warn('[strudel] Sample pack failed to load:', result.reason)
+                }
+              }
+
               // Load alias bank for drum machines
-              
-              aliasBank(`${ts}tidal-drum-machines-alias.json`)
+              try {
+                await aliasBank(`${ts}tidal-drum-machines-alias.json`)
+              } catch (aliasError) {
+                console.warn('[strudel] Drum machine alias bank failed to load:', aliasError)
+              }
             },
             onToggle: (started: boolean) => {
               setIsPlaying(started)

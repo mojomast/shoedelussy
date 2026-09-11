@@ -17,12 +17,98 @@ const EMPTY_PATTERN_CALL_PATTERN = /\b(?:s|n|note|sound|mini)\(\s*(["'])\s*\1\s*
 
 export const unsupportedSoundNames = ['chirp', 'bongo', 'conga', 'timbale', 'cowbell', 'tambourine', 'clap2']
 
-export const VERIFIED_BANK_VOICES: Record<string, string[]> = {
-  RolandTR808: ['bd', 'sd', 'hh', 'oh', 'cp', 'lt', 'mt', 'ht', 'cb', 'cy', 'cl', 'rs', 'ma'],
-  RolandTR909: ['bd', 'sd', 'hh', 'oh', 'cp', 'lt', 'mt', 'ht', 'rim', 'cb'],
-  RolandTR707: ['bd', 'sd', 'hh', 'oh', 'cp', 'lt', 'ht', 'cy', 'rs'],
-  AkaiLinn: ['bd', 'sd', 'hh', 'oh', 'cp', 'tm', 'lt', 'mt', 'ht', 'cy'],
+// Canonical bank name -> available voices, derived from the tidal-drum-machines
+// pack that the editor loads. Keep in sync with the sample loading in
+// ui/src/components/StrudelEditor.tsx.
+const VERIFIED_BANK_VOICE_DATA = `
+AJKPercusyn:bd,sd,ht,cb
+AkaiLinn:bd,sd,hh,oh,cp,cr,rd,lt,mt,ht,cb,tb,sh
+AkaiMPC60:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,perc,misc
+AkaiXR10:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,tb,sh,perc,misc
+AlesisHR16:bd,sd,hh,oh,cp,rim,lt,ht,sh,perc
+AlesisSR16:bd,sd,hh,oh,cp,cr,rd,rim,cb,tb,sh,perc,misc
+BossDR110:bd,sd,hh,oh,cp,cr,rd
+BossDR220:bd,sd,hh,oh,cp,cr,rd,lt,mt,ht,perc
+BossDR55:bd,sd,hh,rim
+BossDR550:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,tb,sh,perc,misc
+CasioRZ1:bd,sd,hh,cp,cr,rd,rim,lt,mt,ht,cb
+CasioSK1:bd,sd,hh,oh,mt,ht
+CasioVL1:bd,sd,hh
+DoepferMS404:bd,sd,hh,oh,lt
+EmuDrumulator:bd,sd,hh,oh,cp,cr,rim,lt,mt,ht,cb,perc
+EmuModular:bd,perc,misc
+EmuSP12:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,perc,misc
+KorgDDM110:bd,sd,hh,oh,cp,cr,rim,lt,ht
+KorgKPR77:bd,sd,hh,oh,cp
+KorgKR55:bd,sd,hh,oh,cr,rim,ht,cb,perc
+KorgKRZ:bd,sd,hh,oh,cr,rd,lt,ht,misc,fx
+KorgM1:bd,sd,hh,oh,cp,cr,rd,rim,mt,ht,cb,tb,sh,perc,misc
+KorgMinipops:bd,sd,hh,oh,misc
+KorgPoly800:bd
+KorgT3:bd,sd,hh,oh,cp,rim,sh,perc,misc
+Linn9000:bd,sd,hh,oh,cr,rd,rim,lt,mt,ht,cb,tb,perc
+LinnDrum:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,tb,sh,perc
+LinnLM1:bd,sd,hh,oh,cp,rim,lt,ht,cb,tb,sh,perc
+LinnLM2:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,tb,sh
+MFB512:bd,sd,hh,oh,cp,cr,lt,mt,ht
+MPC1000:bd,sd,hh,oh,cp,sh,perc
+MoogConcertMateMG1:bd,sd
+OberheimDMX:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,tb,sh
+RhodesPolaris:bd,sd,misc
+RhythmAce:bd,sd,hh,oh,lt,ht,perc
+RolandCompurhythm1000:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,perc
+RolandCompurhythm78:bd,sd,hh,oh,cb,tb,perc,misc
+RolandCompurhythm8000:bd,sd,hh,oh,cp,cr,rim,lt,mt,ht,cb,perc
+RolandD110:bd,sd,hh,oh,cr,rd,rim,lt,cb,tb,sh,perc
+RolandD70:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,cb,sh,perc
+RolandDDR30:bd,sd,lt,ht
+RolandJD990:bd,sd,hh,oh,cp,cr,rd,lt,mt,ht,cb,tb,perc,misc
+RolandMC202:bd,ht,perc
+RolandMC303:bd,sd,hh,oh,cp,rd,rim,lt,mt,ht,cb,tb,sh,perc,misc,fx
+RolandMT32:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,tb,sh,perc
+RolandR8:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,tb,sh,perc
+RolandS50:bd,sd,oh,cp,cr,rd,lt,mt,ht,cb,tb,sh,perc,misc
+RolandSH09:bd
+RolandSystem100:bd,sd,hh,oh,perc,misc
+RolandTR505:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,perc
+RolandTR606:bd,sd,hh,oh,cr,lt,ht
+RolandTR626:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,tb,sh,perc
+RolandTR707:bd,sd,hh,oh,cp,cr,rim,lt,mt,ht,cb,tb
+RolandTR727:sh,perc
+RolandTR808:bd,sd,hh,oh,cp,cr,rim,lt,mt,ht,cb,sh,perc
+RolandTR909:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht
+SakataDPM48:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,sh,perc
+SequentialCircuitsDrumtracks:bd,sd,hh,oh,cp,cr,rd,rim,ht,cb,tb,sh
+SequentialCircuitsTom:bd,sd,hh,oh,cp,cr,ht
+SergeModular:bd,perc,misc
+SimmonsSDS400:sd,lt,mt,ht
+SimmonsSDS5:bd,sd,hh,oh,rim,lt,mt,ht
+SoundmastersR88:bd,sd,hh,oh,cr
+UnivoxMicroRhythmer12:bd,sd,hh,oh
+ViscoSpaceDrum:bd,sd,hh,oh,rim,lt,mt,ht,cb,perc,misc
+XdrumLM8953:bd,sd,hh,oh,cr,rd,rim,lt,mt,ht,tb
+YamahaRM50:bd,sd,hh,oh,cp,cr,rd,lt,mt,ht,cb,tb,sh,perc,misc
+YamahaRX21:bd,sd,hh,oh,cp,cr,lt,mt,ht
+YamahaRX5:bd,sd,hh,oh,rim,lt,cb,tb,sh,fx
+YamahaRY30:bd,sd,hh,oh,cp,cr,rd,rim,lt,mt,ht,cb,tb,sh,perc,misc
+YamahaTG33:bd,sd,oh,cp,cr,rd,rim,lt,mt,ht,cb,tb,sh,perc,misc,fx
+`
+
+const parseBankVoices = (data: string): Record<string, string[]> => {
+  const banks: Record<string, string[]> = {}
+  for (const line of data.trim().split('\n')) {
+    const [bank, voices] = line.split(':')
+    if (!bank || !voices) continue
+    banks[bank.trim()] = voices.split(',').map((voice) => voice.trim()).filter(Boolean)
+  }
+  return banks
 }
+
+export const VERIFIED_BANK_VOICES: Record<string, string[]> = parseBankVoices(VERIFIED_BANK_VOICE_DATA)
+
+const BANK_NAME_BY_LOWER = new Map(
+  Object.keys(VERIFIED_BANK_VOICES).map((bank) => [bank.toLowerCase(), bank]),
+)
 
 interface SanitizedCodeResult {
   code: string
@@ -202,26 +288,37 @@ export const sanitizeStrudelCode = (input: string): SanitizedCodeResult => {
     substitutions.push(`Mapped unsupported percussion \`${soundName}\` to \`hh\`.`)
   }
 
+  // Reject unknown banks up front (case-insensitively), then normalize casing.
+  for (const rawBank of dedupe(Array.from(code.matchAll(/\.bank\("([^\"]+)"\)/g), (match) => match[1]))) {
+    if (!BANK_NAME_BY_LOWER.has(rawBank.toLowerCase())) {
+      blockingIssues.push(`Unsupported drum bank \`${rawBank}\`. Use a bank from the available drum machine list.`)
+    }
+  }
+
+  code = code.replace(/\.bank\("([^\"]+)"\)/g, (match, bank: string) => {
+    const canonical = BANK_NAME_BY_LOWER.get(bank.toLowerCase())
+    if (!canonical) return match
+    if (canonical !== bank) {
+      substitutions.push(`Normalized drum bank \`${bank}\` to \`${canonical}\`.`)
+    }
+    return `.bank("${canonical}")`
+  })
+
+  // Remap invalid voices for the common s("voice(steps)").bank(...) shape.
   code = code.replace(
-    /s\("([a-z]+)\(([^\"]*)\)"\)\.bank\("([^\"]+)"\)/g,
+    /s\("([a-zA-Z0-9]+)\(([^\"]*)\)"\)\.bank\("([^\"]+)"\)/g,
     (match, voice: string, steps: string, bank: string) => {
       const validVoices = VERIFIED_BANK_VOICES[bank]
-      if (!validVoices) {
-        blockingIssues.push(`Unsupported drum bank \`${bank}\`. Use one of the verified banks only.`)
-        return match
+      if (!validVoices) return match
+      const lowerVoice = voice.toLowerCase()
+      if (validVoices.includes(lowerVoice)) {
+        return lowerVoice === voice ? match : `s("${lowerVoice}(${steps})").bank("${bank}")`
       }
-      if (validVoices.includes(voice)) return match
       const fallbackVoice = validVoices.includes('bd') ? 'bd' : validVoices[0]
       substitutions.push(`Mapped invalid voice \`${bank}.${voice}\` to \`${bank}.${fallbackVoice}\`.`)
       return `s("${fallbackVoice}(${steps})").bank("${bank}")`
     },
   )
-
-  for (const bank of dedupe(Array.from(code.matchAll(/\.bank\("([^\"]+)"\)/g), (match) => match[1]))) {
-    if (!VERIFIED_BANK_VOICES[bank]) {
-      blockingIssues.push(`Unsupported drum bank \`${bank}\`. Use one of the verified banks only.`)
-    }
-  }
 
   return {
     code,

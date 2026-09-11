@@ -137,6 +137,7 @@ Rules:
 - Keep existing structure unless the user explicitly asks for a rewrite.
 - If the request is impossible in supported Strudel, explain that and set has_code_change to false.
 - ".sometimesBy()" always requires two arguments: a probability and a transform, for example ".sometimesBy(0.3, rev)" or ".sometimesBy(0.2, x => x.speed(2))".
+- 70+ vintage drum machines are preloaded; use .bank("RolandTR909"), .bank("OberheimDMX"), .bank("LinnDrum") etc. with .n("0 1 2") for variation.
 
 JSON shape:
 {
@@ -219,11 +220,26 @@ SUPPORTED BEHAVIOR
 - Use .jux(rev) for subtle stereo interest on melodic patterns.
 - Use .off(1/8, rev) for an echo-style variation. Never use arithmetic like .add()/.mul()/.sub() inside .off() on note() or n() patterns; use rev, gain, or speed transforms instead.
 - Use .every(4, x => x.rev()) for periodic variation.
+- Use .n("0 1 2 3") to pick variations when a sound has multiple samples (drums, banks, piano, wavetables). This adds a lot of life for free.
 - For multi-track code, prefer named $ tracks like drums$: bass$: chords$: lead$: when creating or rewriting stacked arrangements.
+
+LOADED SAMPLE PACKS (already available; no samples() call needed)
+
+- Classic drum one-shots: bd, sd, hh, oh, cp, rim, cr, rd, ht, mt, lt, cb, tb, sh, perc, misc.
+- Vintage drum machines via .bank("Name"): 70+ banks (see the verified list below). Use .n(...) for variations.
+- Breakbeats and loops: breaks125, breaks152, breaks157, breaks165, amencutup, and amen1 / amen2 / amen3, plus the clean-breaks loops.
+- 808/909 one-shots: 808bd, 808sd, 808cy, 808hh, 909.
+- Piano: s("piano").n("<0 3 5>") or combine with note().
+- Wavetables: wt_digital, wt_digital_bad_day, wt_vgame (use .s("wt_digital").n("<0 1 2>")).
+- Soundfonts (realistic GM instruments, gm_ prefix): gm_epiano1, gm_acoustic_bass, gm_lead_1_square, gm_string_ensemble_1, gm_glockenspiel, gm_flute, gm_pad_warm, and many more.
+- Other loaded packs: Fox percussion (fclap, fdarkkick, fbeep, ftriangle, ftoms, fscrap, fsnap), pad synth (swpad), VCSL orchestral samples, mridangam, EmuSP12, uzu-drumkit.
+- Synthesizers: sawtooth, square, triangle, sine, plus ZZFX chip sounds z_sawtooth, z_square, z_noise.
+
+To load extra packs beyond these, put samples() on its own line at the very TOP of the code (before any pattern), for example samples('bubo:fox') or samples('github:tidalcycles/dirt-samples').
 
 VERIFIED BANK + VOICE COMBINATIONS
 
-Only the following bank + voice pairs are allowed for .bank():
+These banks are loaded and safe to use with .bank(). Prefer the listed voice names (matching samples exist; other voices may not):
 ${bankVoiceLines}
 
 Unsupported sound names:

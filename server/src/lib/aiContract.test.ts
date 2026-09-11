@@ -126,6 +126,24 @@ describe('sanitizeStrudelCode', () => {
     expect(sanitizeStrudelCode(code).blockingIssue).toMatch(/empty mini-notation/i)
   })
 
+  it('accepts the expanded drum machine bank list', () => {
+    const sanitized = sanitizeStrudelCode('setcps(0.5)\n$: s("bd sd hh").bank("OberheimDMX")')
+    expect(sanitized.blockingIssue).toBeNull()
+    expect(sanitized.code).toContain('.bank("OberheimDMX")')
+  })
+
+  it('normalizes lowercase bank names to canonical casing', () => {
+    const sanitized = sanitizeStrudelCode('setcps(0.5)\n$: s("bd sd").bank("rolandtr909")')
+    expect(sanitized.blockingIssue).toBeNull()
+    expect(sanitized.code).toContain('.bank("RolandTR909")')
+    expect(sanitized.substitutions.join(' ')).toMatch(/normalized/i)
+  })
+
+  it('rejects unknown drum banks', () => {
+    const sanitized = sanitizeStrudelCode('setcps(0.5)\n$: s("bd sd").bank("NotARealBank")')
+    expect(sanitized.blockingIssue).toMatch(/unsupported drum bank/i)
+  })
+
   it('blocks no-op sometimesBy transforms', () => {
     const sanitized = sanitizeStrudelCode('setcps(0.5)\n$: s("blong_is_a_kitty_cat").sometimesBy(0.1, x => x)')
     expect(sanitized.blockingIssue).toBeNull()
