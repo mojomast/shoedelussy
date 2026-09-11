@@ -130,17 +130,24 @@ export const useTutorial = ({ getCode, onLessonLoad }: UseTutorialOptions): UseT
 
   const incompleteCount = useMemo(() => allLessons.filter((lesson) => !state.completedLessons.has(lesson.id)).length, [state.completedLessons])
 
+  const pendingProgressRef = useRef<TutorialProgressData | null>(null)
+
   const persist = useCallback((nextState: TutorialProgressData) => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
     }
 
+    pendingProgressRef.current = {
+      completedLessons: nextState.completedLessons,
+      currentLessonId: nextState.currentLessonId,
+      revealedHintCount: nextState.revealedHintCount,
+    }
+
     debounceRef.current = setTimeout(() => {
-      saveTutorialProgress({
-        completedLessons: nextState.completedLessons,
-        currentLessonId: nextState.currentLessonId,
-        revealedHintCount: nextState.revealedHintCount,
-      })
+      if (pendingProgressRef.current) {
+        saveTutorialProgress(pendingProgressRef.current)
+        pendingProgressRef.current = null
+      }
     }, 500)
   }, [])
 
@@ -155,6 +162,12 @@ export const useTutorial = ({ getCode, onLessonLoad }: UseTutorialOptions): UseT
   useEffect(() => () => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
+      // Flush any pending write so finishing a lesson then navigating away
+      // does not lose progress.
+      if (pendingProgressRef.current) {
+        saveTutorialProgress(pendingProgressRef.current)
+        pendingProgressRef.current = null
+      }
     }
     if (validationDebounceRef.current) {
       clearTimeout(validationDebounceRef.current)

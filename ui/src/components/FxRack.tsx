@@ -55,12 +55,14 @@ const FxRack = ({ code, collapsed, onToggle, onApplyCode }: FxRackProps) => {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <button
               type="button"
+              aria-pressed={!!enabled[control.effect]}
+              aria-label={`${enabled[control.effect] ? 'Disable' : 'Enable'} ${control.label}`}
               onClick={() => setEnabled((current) => ({ ...current, [control.effect]: !current[control.effect] }))}
               className={enabled[control.effect]
                 ? 'rounded-full px-2 py-0.5 text-xs bg-purple-600 text-white'
                 : 'rounded-full px-2 py-0.5 text-xs border border-zinc-700 text-zinc-500'}
             >
-              On
+              {enabled[control.effect] ? 'On' : 'Off'}
             </button>
             <input
               type="range"

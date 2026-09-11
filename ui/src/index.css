@@ -216,9 +216,16 @@ body {
 }
 
 .ussy-resize-handle:hover::after,
-.ussy-resize-handle:active::after {
+.ussy-resize-handle:active::after,
+.ussy-resize-handle:focus-visible::after {
   background: var(--ussy-accent);
   height: 48px;
+}
+
+.ussy-resize-handle:focus-visible {
+  outline: none;
+  background: color-mix(in oklch, var(--ussy-accent) 18%, transparent);
+  border-radius: 3px;
 }
 
 /* Chevron rotation for accordion headers */

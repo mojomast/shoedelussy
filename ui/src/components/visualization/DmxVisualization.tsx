@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getDmxPostHeaders } from '@/lib/dmxBridge'
 import type { DmxVisualizationData } from './types'
 
@@ -9,8 +9,14 @@ interface DmxVisualizationProps {
 
 const DmxVisualization = ({ data, bridgeUrl }: DmxVisualizationProps) => {
   const [isApplying, setIsApplying] = useState(false)
+  const [sceneError, setSceneError] = useState<string | null>(null)
+  const mountedRef = useRef(true)
   const channels = data?.universe?.channels ?? Array.from({ length: 32 }, () => 0)
   const previewChannels = channels.slice(0, 32)
+
+  useEffect(() => () => {
+    mountedRef.current = false
+  }, [])
 
   const handleApplyScene = async (sceneId: string) => {
     if (!bridgeUrl) {
@@ -18,14 +24,24 @@ const DmxVisualization = ({ data, bridgeUrl }: DmxVisualizationProps) => {
     }
 
     setIsApplying(true)
+    setSceneError(null)
     try {
-      await fetch(`${bridgeUrl}/scenes/apply`, {
+      const response = await fetch(`${bridgeUrl}/scenes/apply`, {
         method: 'POST',
         headers: getDmxPostHeaders(),
         body: JSON.stringify({ scene_id: sceneId }),
       })
+      if (!response.ok) {
+        throw new Error(`Scene request failed: ${response.status}`)
+      }
+    } catch (error) {
+      if (mountedRef.current) {
+        setSceneError(error instanceof Error ? error.message : 'Unable to apply scene.')
+      }
     } finally {
-      setIsApplying(false)
+      if (mountedRef.current) {
+        setIsApplying(false)
+      }
     }
   }
 
@@ -55,6 +71,11 @@ const DmxVisualization = ({ data, bridgeUrl }: DmxVisualizationProps) => {
               {scene.label}
             </button>
           ))}
+        </div>
+      ) : null}
+      {sceneError ? (
+        <div className="mb-3 rounded-lg border border-red-900/70 bg-red-950/30 px-3 py-2 text-xs text-red-200" role="alert">
+          {sceneError}
         </div>
       ) : null}
       <div className="grid flex-1 grid-cols-8 gap-2">

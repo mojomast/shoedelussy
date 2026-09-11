@@ -15,7 +15,7 @@
  */
 
 import { Link } from 'react-router-dom'
-import { useState, useEffect, useCallback, useRef, type ComponentProps } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps } from 'react'
 import { FolderKanban, Sliders, Disc, LayoutGrid, SlidersHorizontal, Clock, ChevronDown, ChevronsUpDown, Lightbulb } from 'lucide-react'
 import ArrangePanel from '@/components/ArrangePanel'
 import DmxControlPanel from '@/components/DmxControlPanel'
@@ -304,10 +304,10 @@ const DawPanel = ({
     })
   }, [allOpen])
 
-  // ---- Derived data ----
-  const trackGains = parseTrackGains(project.strudel_code)
-  const trackCandidates: ParsedTrack[] = parseTracks(project.strudel_code)
-  const fxCount = (project.strudel_code.match(FX_PATTERN) || []).length
+  // ---- Derived data (memoized; re-parsed only when the code changes) ----
+  const trackGains = useMemo(() => parseTrackGains(project.strudel_code), [project.strudel_code])
+  const trackCandidates = useMemo<ParsedTrack[]>(() => parseTracks(project.strudel_code), [project.strudel_code])
+  const fxCount = useMemo(() => (project.strudel_code.match(FX_PATTERN) || []).length, [project.strudel_code])
   const sectionCount = sections.length
   const versionCount = versionPanel.versions.length
 

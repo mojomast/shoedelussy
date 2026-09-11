@@ -17,6 +17,7 @@ const HalVisualization = ({ isPlaying, isListening, audioAnalyser }: HalVisualiz
   const voiceAnalyserRef = useRef<AnalyserNode | null>(null)
   const voiceDataArrayRef = useRef<Uint8Array | null>(null)
   const voiceStreamRef = useRef<MediaStream | null>(null)
+  const voiceAudioContextRef = useRef<AudioContext | null>(null)
   const strudelCanvasesRef = useRef<HTMLCanvasElement[]>([])
   const lastPlayingStateRef = useRef<boolean>(false)
   const particlesRef = useRef<Array<{
@@ -61,6 +62,10 @@ const HalVisualization = ({ isPlaying, isListening, audioAnalyser }: HalVisualiz
         voiceStreamRef.current.getTracks().forEach(track => track.stop())
         voiceStreamRef.current = null
       }
+      if (voiceAudioContextRef.current) {
+        void voiceAudioContextRef.current.close().catch(() => undefined)
+        voiceAudioContextRef.current = null
+      }
       voiceAnalyserRef.current = null
       voiceDataArrayRef.current = null
       return
@@ -72,6 +77,7 @@ const HalVisualization = ({ isPlaying, isListening, audioAnalyser }: HalVisualiz
         voiceStreamRef.current = stream
         
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+        voiceAudioContextRef.current = audioContext
         const source = audioContext.createMediaStreamSource(stream)
         const analyser = audioContext.createAnalyser()
         
@@ -93,6 +99,10 @@ const HalVisualization = ({ isPlaying, isListening, audioAnalyser }: HalVisualiz
     return () => {
       if (voiceStreamRef.current) {
         voiceStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (voiceAudioContextRef.current) {
+        void voiceAudioContextRef.current.close().catch(() => undefined)
+        voiceAudioContextRef.current = null
       }
     }
   }, [isListening])

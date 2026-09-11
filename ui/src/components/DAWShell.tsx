@@ -145,10 +145,25 @@ const DAWShell = ({
       setIsDragging(false)
       document.removeEventListener('pointermove', onMove)
       document.removeEventListener('pointerup', onUp)
+      document.removeEventListener('pointercancel', onUp)
     }
 
     document.addEventListener('pointermove', onMove)
     document.addEventListener('pointerup', onUp)
+    document.addEventListener('pointercancel', onUp)
+  }, [chatWidth])
+
+  // Keyboard resizing for the chat handle (ARIA separator contract)
+  const handleChatResizeKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 40 : 10
+    let next = chatWidth
+    if (e.key === 'ArrowLeft') next -= step
+    else if (e.key === 'ArrowRight') next += step
+    else if (e.key === 'Home') next = CHAT_MIN
+    else if (e.key === 'End') next = CHAT_MAX
+    else return
+    e.preventDefault()
+    setChatWidth(Math.min(CHAT_MAX, Math.max(CHAT_MIN, next)))
   }, [chatWidth])
 
   // Resize handler for daw panel (left edge) — pointer events
@@ -169,10 +184,25 @@ const DAWShell = ({
       setIsDragging(false)
       document.removeEventListener('pointermove', onMove)
       document.removeEventListener('pointerup', onUp)
+      document.removeEventListener('pointercancel', onUp)
     }
 
     document.addEventListener('pointermove', onMove)
     document.addEventListener('pointerup', onUp)
+    document.addEventListener('pointercancel', onUp)
+  }, [dawWidth])
+
+  // Keyboard resizing for the DAW handle (grows leftward)
+  const handleDawResizeKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 40 : 10
+    let next = dawWidth
+    if (e.key === 'ArrowLeft') next += step
+    else if (e.key === 'ArrowRight') next -= step
+    else if (e.key === 'Home') next = DAW_MIN
+    else if (e.key === 'End') next = DAW_MAX
+    else return
+    e.preventDefault()
+    setDawWidth(Math.min(DAW_MAX, Math.max(DAW_MIN, next)))
   }, [dawWidth])
 
   // Keyboard shortcuts
@@ -274,13 +304,15 @@ const DAWShell = ({
                 <div
                   className="ussy-resize-handle"
                   onPointerDown={chatCollapsed ? undefined : handleChatResizeStart}
+                  onKeyDown={chatCollapsed ? undefined : handleChatResizeKeyDown}
                   role="separator"
-                  tabIndex={0}
+                  tabIndex={chatCollapsed ? -1 : 0}
                   aria-orientation="vertical"
                   aria-valuenow={chatWidth}
                   aria-valuemin={CHAT_MIN}
                   aria-valuemax={CHAT_MAX}
                   aria-label="Resize chat panel"
+                  title="Drag or use arrow keys to resize"
                 />
               </>
             )}
@@ -314,13 +346,15 @@ const DAWShell = ({
                 <div
                   className="ussy-resize-handle"
                   onPointerDown={dawCollapsed ? undefined : handleDawResizeStart}
+                  onKeyDown={dawCollapsed ? undefined : handleDawResizeKeyDown}
                   role="separator"
-                  tabIndex={0}
+                  tabIndex={dawCollapsed ? -1 : 0}
                   aria-orientation="vertical"
                   aria-valuenow={dawWidth}
                   aria-valuemin={DAW_MIN}
                   aria-valuemax={DAW_MAX}
                   aria-label="Resize DAW panel"
+                  title="Drag or use arrow keys to resize"
                 />
 
                 {/* RIGHT: DAW Panel or collapsed icon rail */}

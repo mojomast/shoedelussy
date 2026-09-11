@@ -152,7 +152,8 @@ const TutorialOverlay = ({ lesson, isOpen }: TutorialOverlayProps) => {
           height: rect.height + 16,
           borderRadius: 'var(--radius-md)',
           boxShadow: '0 0 0 100vmax oklch(0 0 0 / 0.7)',
-          pointerEvents: 'auto',
+          // Let clicks pass through to the control being highlighted.
+          pointerEvents: 'none',
         }}
       />
       <div

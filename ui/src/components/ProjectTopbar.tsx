@@ -152,6 +152,12 @@ const ProjectTopbar = ({
 }: ProjectTopbarProps) => {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<DrawerTab>('ai')
+  // Local draft so the field can be cleared/retyped; committed on blur/Enter.
+  const [bpmDraft, setBpmDraft] = useState(bpm != null ? String(bpm) : '')
+
+  useEffect(() => {
+    setBpmDraft(bpm != null ? String(bpm) : '')
+  }, [bpm])
 
   // ── ⌘, keyboard shortcut to toggle drawer + Escape to close ───
   const toggleDrawer = useCallback(() => setDrawerOpen((prev) => !prev), [])
@@ -235,17 +241,27 @@ const ProjectTopbar = ({
           min={20}
           max={300}
           step={1}
-          value={bpm ?? ''}
+          value={bpmDraft}
           placeholder="BPM"
-          onChange={(e) => {
-            const val = Number(e.target.value)
-            if (Number.isFinite(val) && val > 0 && onBpmChange) {
-              onBpmChange(val)
+          onChange={(e) => setBpmDraft(e.target.value)}
+          onBlur={() => {
+            const parsed = Number(bpmDraft)
+            if (Number.isFinite(parsed) && bpmDraft.trim() !== '' && parsed > 0) {
+              const clamped = Math.min(300, Math.max(20, Math.round(parsed)))
+              setBpmDraft(String(clamped))
+              onBpmChange?.(clamped)
+            } else {
+              setBpmDraft(bpm != null ? String(bpm) : '')
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.currentTarget.blur()
             }
           }}
           className={`${inputClass} w-[60px] tabular-nums`}
           aria-label="BPM"
-          title="Beats per minute"
+          title="Beats per minute (20-300)"
         />
 
         {/* 5. Key input */}

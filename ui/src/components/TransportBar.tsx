@@ -142,7 +142,7 @@ const TransportBar = ({
       >
         <div
           className="h-full bg-gradient-to-r from-[var(--ussy-accent-dim)] to-[var(--ussy-accent)] transition-all duration-100"
-          style={{ width: `${Math.max(3, phase * 100)}%` }}
+          style={{ width: `${Math.min(100, Math.max(0, phase * 100))}%` }}
         />
       </div>
     </Card>

@@ -27,15 +27,18 @@ const ProjectsPage = () => {
     }))
     setProjects(localProjects)
 
+    let cancelled = false
     const userId = getOrCreateGuestUserId()
     api.listProjects(userId).then((remoteProjects) => {
-      if (remoteProjects.length > 0) {
-        setRemoteProjectIds(new Set(remoteProjects.map((project) => project.id)))
-        setProjects(remoteProjects)
-      }
+      if (cancelled || remoteProjects.length === 0) return
+      setRemoteProjectIds(new Set(remoteProjects.map((project) => project.id)))
+      setProjects(remoteProjects)
     }).catch(() => {
       // Guest/local mode fallback.
     })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const filteredProjects = useMemo(() => {
@@ -72,6 +75,7 @@ const ProjectsPage = () => {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search by name, key, or tag"
+            aria-label="Search projects"
             className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
           />
         </div>
@@ -97,6 +101,7 @@ const ProjectsPage = () => {
                   </Button>
                   <Button
                     variant="outline"
+                    aria-label={`Delete ${project.name}`}
                     className="border-zinc-700 bg-transparent text-zinc-300 hover:bg-zinc-900"
                     onClick={() => {
                       const userId = getOrCreateGuestUserId()

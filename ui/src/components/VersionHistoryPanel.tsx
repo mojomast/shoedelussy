@@ -18,7 +18,11 @@ const VersionHistoryPanel = ({ versions, isLoading, isRestoring, error, onRefres
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold">Version history</p>
-            <p className="text-xs text-zinc-500">Server-backed snapshots you can restore into the editor.</p>
+            <p className="text-xs text-zinc-500">
+              {versions.length > 0
+                ? `${versions.length} saved snapshot${versions.length === 1 ? '' : 's'}. Showing the most recent ${Math.min(versions.length, 10)}.`
+                : 'Server-backed snapshots you can restore into the editor.'}
+            </p>
           </div>
           <Button variant="outline" className="border-zinc-700 bg-transparent text-zinc-300 hover:bg-zinc-900" onClick={onRefresh}>
             Refresh
