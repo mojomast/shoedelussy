@@ -65,6 +65,7 @@ const TutorialPanel = ({
   const [shakeKey, setShakeKey] = useState(0)
   const passTimeoutRef = useRef<number | null>(null)
   const confettiTimeoutRef = useRef<number | null>(null)
+  const failTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     setShowReplaceConfirm(false)
@@ -72,6 +73,10 @@ const TutorialPanel = ({
     setValidationState('idle')
     setFeedback(null)
     setShowConfetti(false)
+    if (failTimeoutRef.current) {
+      window.clearTimeout(failTimeoutRef.current)
+      failTimeoutRef.current = null
+    }
   }, [currentLesson.id])
 
   useEffect(() => {
@@ -81,6 +86,9 @@ const TutorialPanel = ({
       }
       if (confettiTimeoutRef.current) {
         window.clearTimeout(confettiTimeoutRef.current)
+      }
+      if (failTimeoutRef.current) {
+        window.clearTimeout(failTimeoutRef.current)
       }
     }
   }, [])
@@ -160,7 +168,10 @@ const TutorialPanel = ({
     setFeedback(result.hint ?? 'Not quite yet. Try the next hint.')
     setShakeKey((value) => value + 1)
     revealNextHint()
-    window.setTimeout(() => setValidationState('idle'), 400)
+    if (failTimeoutRef.current) {
+      window.clearTimeout(failTimeoutRef.current)
+    }
+    failTimeoutRef.current = window.setTimeout(() => setValidationState('idle'), 400)
   }
 
   return (

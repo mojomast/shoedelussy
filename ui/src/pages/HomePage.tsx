@@ -82,21 +82,25 @@ const HomePage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [toggleUiMode, tutorial.state.activeTab, tutorial.setActiveTab, tutorial.openTutorial])
 
-  const refreshDmxVisualization = useCallback(async () => {
+  const refreshDmxVisualization = useCallback(async (signal?: AbortSignal) => {
     if (!dmxBridgeUrl) {
       setDmxVisualizationData(null)
       return
     }
 
     try {
-      const response = await fetch(`${dmxBridgeUrl}/state`)
+      const response = await fetch(`${dmxBridgeUrl}/state`, { signal })
       if (!response.ok) {
         throw new Error(`Bridge state request failed: ${response.status}`)
       }
       const payload = await response.json() as DmxVisualizationData
-      setDmxVisualizationData(payload)
+      if (!signal?.aborted) {
+        setDmxVisualizationData(payload)
+      }
     } catch {
-      setDmxVisualizationData(null)
+      if (!signal?.aborted) {
+        setDmxVisualizationData(null)
+      }
     }
   }, [dmxBridgeUrl])
 
@@ -110,12 +114,9 @@ const HomePage = () => {
       return
     }
 
-    let cancelled = false
+    const controller = new AbortController()
     const poll = async () => {
-      await refreshDmxVisualization()
-      if (cancelled) {
-        return
-      }
+      await refreshDmxVisualization(controller.signal)
     }
 
     void poll()
@@ -124,7 +125,7 @@ const HomePage = () => {
     }, 1000)
 
     return () => {
-      cancelled = true
+      controller.abort()
       window.clearInterval(interval)
     }
   }, [refreshDmxVisualization, showVisualization, visualizationMode])

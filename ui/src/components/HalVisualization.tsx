@@ -424,6 +424,16 @@ const HalVisualization = ({ isPlaying, isListening, audioAnalyser }: HalVisualiz
     }
     lastPlayingStateRef.current = isPlaying
 
+    // Skip the mirroring loop entirely while stopped to save CPU.
+    if (!isPlaying) {
+      try {
+        mirrorCtx.clearRect(0, 0, mirrorCanvas.width, mirrorCanvas.height)
+      } catch {
+        // Ignore a lost context.
+      }
+      return
+    }
+
     // Scale canvas display to fill container width using CSS transform
     // NOTE: Disabled on mobile to prevent layout issues with CodeMirror
     const scaleCanvasToFit = (canvas: HTMLCanvasElement) => {

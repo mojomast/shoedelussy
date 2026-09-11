@@ -24,6 +24,7 @@ interface ChatStreamHandlers {
   onChunk?: (chunk: string) => void
   onDone?: (response: AIResponse) => void
   onStreamError?: (error: ChatStreamErrorInfo) => void
+  signal?: AbortSignal
 }
 
 const buildRequestError = async (response: Response): Promise<Error> => {
@@ -131,104 +132,128 @@ export const api = {
     }, userId),
 
   chatStream: async (payload: ChatPayload, userId: string, handlers: ChatStreamHandlers = {}) => {
-    const response = await fetch(`${API_URL}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(userId ? { 'x-user-id': userId } : {}),
-      },
-      body: JSON.stringify(payload),
-    })
-
-    if (!response.ok) {
-      throw await buildRequestError(response)
+    const controller = new AbortController()
+    const externalSignal = handlers.signal
+    const forwardAbort = () => controller.abort()
+    if (externalSignal) {
+      if (externalSignal.aborted) controller.abort()
+      else externalSignal.addEventListener('abort', forwardAbort)
     }
 
-    if (!response.body) {
-      throw new Error('Streaming response body unavailable')
+    // Abort the stream if the server goes quiet for too long.
+    const IDLE_TIMEOUT_MS = 60_000
+    let idleTimer: ReturnType<typeof setTimeout> | null = null
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS)
     }
 
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let finalResponse: AIResponse | null = null
-    let streamError: ChatStreamErrorInfo | null = null
-    let doneMarkerSeen = false
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+    try {
+      resetIdleTimer()
+      const response = await fetch(`${API_URL}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(userId ? { 'x-user-id': userId } : {}),
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      })
 
-    const processLine = (rawEvent: string): boolean => {
-      const parsedEvent = parseSseEvent(rawEvent)
-      if (!parsedEvent.data) return false
-      if (parsedEvent.isDone) {
-        doneMarkerSeen = true
-        return true
+      if (!response.ok) {
+        throw await buildRequestError(response)
       }
 
-      let parsed: { type?: string; chunk?: string; response?: AIResponse; error?: string }
-      try {
-        parsed = JSON.parse(parsedEvent.data) as typeof parsed
-      } catch {
-        streamError = createChatStreamError('Received a malformed streaming event from the server.')
+      if (!response.body) {
+        throw new Error('Streaming response body unavailable')
+      }
+
+      reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let finalResponse: AIResponse | null = null
+      let streamError: ChatStreamErrorInfo | null = null
+      let doneMarkerSeen = false
+
+      const processLine = (rawEvent: string): boolean => {
+        const parsedEvent = parseSseEvent(rawEvent)
+        if (!parsedEvent.data) return false
+        if (parsedEvent.isDone) {
+          doneMarkerSeen = true
+          return true
+        }
+
+        let parsed: { type?: string; chunk?: string; response?: AIResponse; error?: string }
+        try {
+          parsed = JSON.parse(parsedEvent.data) as typeof parsed
+        } catch {
+          streamError = createChatStreamError('Received a malformed streaming event from the server.')
+          return false
+        }
+
+        if (parsed.type === 'chunk' && parsed.chunk) {
+          handlers.onChunk?.(parsed.chunk)
+          return false
+        }
+        if (parsed.type === 'error' || parsed.type === 'contract_error') {
+          streamError = createChatStreamError(parsed.error || 'Streaming chat failed')
+          handlers.onStreamError?.(streamError)
+          return true
+        }
+        if (parsed.type === 'done' && parsed.response) {
+          finalResponse = parsed.response
+          return false
+        }
         return false
       }
 
-      if (parsed.type === 'chunk' && parsed.chunk) {
-        handlers.onChunk?.(parsed.chunk)
-        return false
-      }
-      if (parsed.type === 'error' || parsed.type === 'contract_error') {
-        streamError = createChatStreamError(parsed.error || 'Streaming chat failed')
-        handlers.onStreamError?.(streamError)
-        return true
-      }
-      if (parsed.type === 'done' && parsed.response) {
-        finalResponse = parsed.response
-        return false
-      }
-      return false
-    }
+      let readerDone = false
+      while (!readerDone) {
+        const { done, value } = await reader.read()
+        resetIdleTimer()
+        if (done) readerDone = true
+        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done })
+        // Normalize CRLF frame boundaries emitted by some proxies.
+        buffer = buffer.replace(/\r\n/g, '\n')
 
-    let readerDone = false
-    while (!readerDone) {
-      const { done, value } = await reader.read()
-      if (done) readerDone = true
-      buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done })
-      // Normalize CRLF frame boundaries emitted by some proxies.
-      buffer = buffer.replace(/\r\n/g, '\n')
-
-      let boundaryIndex = buffer.indexOf('\n\n')
-      while (boundaryIndex !== -1) {
-        const rawEvent = buffer.slice(0, boundaryIndex)
-        buffer = buffer.slice(boundaryIndex + 2)
-        const streamDone = processLine(rawEvent)
-        boundaryIndex = buffer.indexOf('\n\n')
-        if (streamDone) {
-          readerDone = true
-          break
+        let boundaryIndex = buffer.indexOf('\n\n')
+        while (boundaryIndex !== -1) {
+          const rawEvent = buffer.slice(0, boundaryIndex)
+          buffer = buffer.slice(boundaryIndex + 2)
+          const streamDone = processLine(rawEvent)
+          boundaryIndex = buffer.indexOf('\n\n')
+          if (streamDone) {
+            readerDone = true
+            break
+          }
         }
       }
+
+      if (buffer.trim()) {
+        processLine(buffer)
+      }
+
+      if (streamError) {
+        throw new Error((streamError as ChatStreamErrorInfo).message)
+      }
+
+      if (!finalResponse) {
+        const message = doneMarkerSeen
+          ? 'Streaming chat ended without a final structured response'
+          : 'Streaming chat ended before final response was received'
+        const error = createChatStreamError(message)
+        handlers.onStreamError?.(error)
+        throw new Error(error.message)
+      }
+
+      handlers.onDone?.(finalResponse)
+      return finalResponse
+    } finally {
+      if (idleTimer) clearTimeout(idleTimer)
+      if (externalSignal) externalSignal.removeEventListener('abort', forwardAbort)
+      void reader?.cancel().catch(() => undefined)
     }
-
-    void reader.cancel().catch(() => undefined)
-
-    if (buffer.trim()) {
-      processLine(buffer)
-    }
-
-    if (streamError) {
-      throw new Error((streamError as ChatStreamErrorInfo).message)
-    }
-
-    if (!finalResponse) {
-      const message = doneMarkerSeen
-        ? 'Streaming chat ended without a final structured response'
-        : 'Streaming chat ended before final response was received'
-      const error = createChatStreamError(message)
-      handlers.onStreamError?.(error)
-      throw new Error(error.message)
-    }
-
-    handlers.onDone?.(finalResponse)
-    return finalResponse
   },
 
   shareCode: (code: string, title?: string) =>

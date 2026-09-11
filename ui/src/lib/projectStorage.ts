@@ -1,5 +1,5 @@
 import { DEFAULT_SYSTEM_PROMPT_MODE } from '@/types/project'
-import type { Project, SavedPromptPreset, SystemPromptMode } from '@/types/project'
+import type { ChatMessage, CodeVersion, LightingProjectState, Project, SavedPromptPreset, SystemPromptMode } from '@/types/project'
 import { createId } from '@/lib/utils'
 
 const PROJECTS_KEY = 'shoedelussy.projects'
@@ -20,6 +20,7 @@ export interface TutorialProgressData {
   completedLessons: string[]
   currentLessonId: string | null
   revealedHintCount: number
+  seenOverlays?: string[]
 }
 
 const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
@@ -69,13 +70,50 @@ const normalizeSystemPromptMode = (value?: string): SystemPromptMode => (
   value === 'legacy-toaster' ? 'legacy-toaster' : DEFAULT_SYSTEM_PROMPT_MODE
 )
 
+const asStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
+
+// Coerce persisted JSON into a well-formed Project so corrupted or legacy
+// localStorage data cannot crash consumers that assume string fields.
+const sanitizeProject = (value: unknown): Project | null => {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  if (typeof record.id !== 'string' || record.id.length === 0) return null
+
+  const now = new Date().toISOString()
+  return {
+    id: record.id,
+    user_id: typeof record.user_id === 'string' ? record.user_id : 'guest-session',
+    name: typeof record.name === 'string' ? record.name : 'Untitled Project',
+    description: typeof record.description === 'string' ? record.description : undefined,
+    strudel_code: typeof record.strudel_code === 'string' ? record.strudel_code : '',
+    chat_history: Array.isArray(record.chat_history) ? (record.chat_history as ChatMessage[]) : [],
+    versions: Array.isArray(record.versions) ? (record.versions as CodeVersion[]) : [],
+    lighting: record.lighting && typeof record.lighting === 'object' ? (record.lighting as LightingProjectState) : undefined,
+    bpm: typeof record.bpm === 'number' && Number.isFinite(record.bpm) ? record.bpm : undefined,
+    key: typeof record.key === 'string' ? record.key : undefined,
+    tags: asStringArray(record.tags),
+    is_public: typeof record.is_public === 'boolean' ? record.is_public : undefined,
+    created_at: typeof record.created_at === 'string' ? record.created_at : now,
+    updated_at: typeof record.updated_at === 'string' ? record.updated_at : now,
+  }
+}
+
 const readProjects = (): Record<string, Project> => {
   if (!canUseStorage()) return {}
   const raw = getStorageItem(PROJECTS_KEY, LEGACY_PROJECTS_KEY)
   if (!raw) return {}
 
   try {
-    return JSON.parse(raw) as Record<string, Project>
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+
+    const result: Record<string, Project> = {}
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      const project = sanitizeProject(value)
+      if (project) result[key] = project
+    }
+    return result
   } catch {
     return {}
   }
@@ -202,7 +240,17 @@ export const upsertPromptPreset = (label: string, content: string): SavedPromptP
 export function saveTutorialProgress(data: TutorialProgressData): void {
   if (!canUseStorage()) return
 
-  safeSetItem(TUTORIAL_PROGRESS_KEY, JSON.stringify(data))
+  // Preserve overlay dismissal state written by the tutorial overlay so this
+  // write does not clobber it.
+  let next = data
+  if (data.seenOverlays === undefined) {
+    const existing = loadTutorialProgress()
+    if (existing?.seenOverlays && existing.seenOverlays.length > 0) {
+      next = { ...data, seenOverlays: existing.seenOverlays }
+    }
+  }
+
+  safeSetItem(TUTORIAL_PROGRESS_KEY, JSON.stringify(next))
 }
 
 export function loadTutorialProgress(): TutorialProgressData | null {
@@ -220,7 +268,16 @@ export function loadTutorialProgress(): TutorialProgressData | null {
       typeof parsed === 'object' && parsed !== null &&
       'completedLessons' in parsed && Array.isArray((parsed as Record<string, unknown>).completedLessons)
     ) {
-      return parsed as TutorialProgressData
+      const record = parsed as Record<string, unknown>
+      return {
+        completedLessons: asStringArray(record.completedLessons),
+        currentLessonId: typeof record.currentLessonId === 'string' ? record.currentLessonId : null,
+        revealedHintCount:
+          typeof record.revealedHintCount === 'number' && Number.isFinite(record.revealedHintCount)
+            ? record.revealedHintCount
+            : 0,
+        seenOverlays: Array.isArray(record.seenOverlays) ? asStringArray(record.seenOverlays) : undefined,
+      }
     }
     return null
   } catch {

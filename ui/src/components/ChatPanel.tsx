@@ -110,7 +110,7 @@ const ChatPanel = ({
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--ussy-divider)] bg-[var(--ussy-surface)]">
-      <div className="border-b border-[var(--ussy-divider)]" role="tablist" aria-label="Chat and tutorial tabs">
+      <div className="border-b border-[var(--ussy-divider)]">
         {activeTab === 'chat' ? (
           <div className="flex items-center gap-2 px-3 py-2.5">
             <p className="flex-1 text-sm font-semibold text-[var(--ussy-text)]">Session Chat</p>
@@ -140,8 +140,9 @@ const ChatPanel = ({
           </div>
         ) : null}
 
-        <div className="flex border-t border-[var(--ussy-divider)] px-1">
+        <div className="flex border-t border-[var(--ussy-divider)] px-1" role="tablist" aria-label="Chat and tutorial tabs">
           <button
+            id="chat-panel-tabbtn"
             role="tab"
             aria-selected={activeTab === 'chat'}
             aria-controls="chat-panel-tab"
@@ -155,6 +156,7 @@ const ChatPanel = ({
             Chat
           </button>
           <button
+            id="learn-panel-tabbtn"
             role="tab"
             aria-selected={activeTab === 'learn'}
             aria-controls="learn-panel-tab"
@@ -176,12 +178,12 @@ const ChatPanel = ({
       </div>
 
       {activeTab === 'learn' ? (
-        <div id="learn-panel-tab" className="min-h-0 flex-1 overflow-hidden">
+        <div id="learn-panel-tab" role="tabpanel" aria-labelledby="learn-panel-tabbtn" className="min-h-0 flex-1 overflow-hidden">
           <TutorialPanel {...tutorial} />
         </div>
       ) : (
         <>
-          <div id="chat-panel-tab" ref={threadRef} onScroll={handleThreadScroll} className="flex-1 space-y-4 overflow-auto px-3 py-3 sm:px-4 sm:py-4">
+          <div id="chat-panel-tab" role="tabpanel" aria-labelledby="chat-panel-tabbtn" ref={threadRef} onScroll={handleThreadScroll} className="flex-1 space-y-4 overflow-auto px-3 py-3 sm:px-4 sm:py-4">
             {messages.map((message) => {
               const lessonMatch = getLessonMatch(message)
 

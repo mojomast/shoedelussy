@@ -372,8 +372,10 @@ const ProjectTopbar = ({
             {DRAWER_TABS.map((tab) => (
               <button
                 key={tab.id}
+                id={`settings-tab-${tab.id}`}
                 role="tab"
                 aria-selected={activeTab === tab.id}
+                aria-controls={`settings-panel-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
                 className={`relative px-3 py-1.5 text-xs font-medium transition ${
                   activeTab === tab.id
@@ -392,7 +394,7 @@ const ProjectTopbar = ({
 
           {/* ── Tab: AI Settings ── */}
           {activeTab === 'ai' && (
-            <div role="tabpanel" aria-label="AI Settings" className="flex flex-wrap items-center gap-3">
+             <div role="tabpanel" id="settings-panel-ai" aria-labelledby="settings-tab-ai" aria-label="AI Settings" className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-xs text-[var(--ussy-text-muted)]">
                 <span className="shrink-0">System prompt mode</span>
                 <select
@@ -456,7 +458,7 @@ const ProjectTopbar = ({
 
           {/* ── Tab: Prompts ── */}
           {activeTab === 'prompts' && (
-            <div role="tabpanel" aria-label="Prompts" className="flex flex-col gap-3">
+             <div role="tabpanel" id="settings-panel-prompts" aria-labelledby="settings-tab-prompts" aria-label="Prompts" className="flex flex-col gap-3">
               <textarea
                 value={customSystemPrompt}
                 onChange={(e) => onCustomSystemPromptChange(e.target.value)}
@@ -520,7 +522,7 @@ const ProjectTopbar = ({
 
           {/* ── Tab: API ── */}
           {activeTab === 'api' && (
-            <div role="tabpanel" aria-label="API" className="flex flex-col gap-3">
+             <div role="tabpanel" id="settings-panel-api" aria-labelledby="settings-tab-api" aria-label="API" className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-2 text-xs text-[var(--ussy-text-muted)]">
                   <span className="shrink-0">Endpoint</span>
@@ -551,7 +553,7 @@ const ProjectTopbar = ({
 
           {/* ── Tab: Export & Share ── */}
           {activeTab === 'export' && (
-            <div role="tabpanel" aria-label="Export and Share" className="flex flex-col gap-3">
+             <div role="tabpanel" id="settings-panel-export" aria-labelledby="settings-tab-export" aria-label="Export and Share" className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="toolbar"

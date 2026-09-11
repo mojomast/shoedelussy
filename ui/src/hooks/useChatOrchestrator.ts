@@ -129,6 +129,9 @@ const isRetryableEmptyResponseError = (error: unknown) => {
   return EMPTY_RESPONSE_PATTERNS.some((pattern) => message.includes(pattern))
 }
 
+const isAbortError = (error: unknown) =>
+  typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError'
+
 const DEFAULT_CODE = `setcps(0.56)
 
 // [intro]
@@ -269,6 +272,7 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
   const [isArrangePanelCollapsed, setIsArrangePanelCollapsed] = useState(true)
   const [isFxRackCollapsed, setIsFxRackCollapsed] = useState(true)
   const pendingSendContentsRef = useRef(new Set<string>())
+  const activeChatAbortRef = useRef<AbortController | null>(null)
   const loadedShareIdRef = useRef<string | null>(null)
   const lastStreamUpdateRef = useRef(0)
   const bufferedStreamContentRef = useRef('')
@@ -645,6 +649,7 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
     if (flushStreamFrameRef.current) {
       window.cancelAnimationFrame(flushStreamFrameRef.current)
     }
+    activeChatAbortRef.current?.abort()
   }, [])
 
   const onPreviewDiff = useCallback((messageId: string, diff: CodeDiff) => {
@@ -732,8 +737,13 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
       },
     }
     let requestEndedWithError = false
+    // Cancel any in-flight request before starting a new one.
+    activeChatAbortRef.current?.abort()
+    const abortController = new AbortController()
+    activeChatAbortRef.current = abortController
 
     const runChatOnce = async () => api.chatStream(payload, userId, {
+      signal: abortController.signal,
       onChunk: (chunk) => {
         setChatStatus('Streaming response...')
         bufferedStreamContentRef.current += chunk
@@ -831,6 +841,10 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
         }
       }
     } catch (error) {
+      // A cancelled request (unmount or a newer send) is not an error to show.
+      if (isAbortError(error)) {
+        return
+      }
       requestEndedWithError = true
       const errorText = getFriendlyChatError(error)
       setChatError(errorText)
@@ -844,6 +858,9 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
     } finally {
       setIsSending(false)
       pendingSendContentsRef.current.delete(trimmedContent)
+      if (activeChatAbortRef.current === abortController) {
+        activeChatAbortRef.current = null
+      }
       if (!requestEndedWithError) {
         window.setTimeout(() => setChatStatus((current) => (current === 'Patch ready for review.' || current === 'Response ready.' ? null : current)), 2500)
       }

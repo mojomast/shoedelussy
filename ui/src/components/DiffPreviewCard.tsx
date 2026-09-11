@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { ChevronDown, ChevronUp, Square } from 'lucide-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -45,7 +45,16 @@ const syntaxStyle = {
 const DiffPreviewCard = ({ messageId, diff, status = 'pending', isPreviewing = false, onApply, onReject, onPreview, onStopPreview }: DiffPreviewCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false)
   const lines = useMemo(() => diffLines(diff.before, diff.after), [diff.before, diff.after])
-  const visibleLines = useMemo(() => (isExpanded ? lines : lines.slice(0, DIFF_PREVIEW_LINE_LIMIT)), [isExpanded, lines])
+  // When collapsed, center the window on the first real change instead of the
+  // top of the file, which often hides the actual patch.
+  const { visibleLines, windowStart } = useMemo(() => {
+    if (isExpanded || lines.length <= DIFF_PREVIEW_LINE_LIMIT) {
+      return { visibleLines: lines, windowStart: 0 }
+    }
+    const firstChange = lines.findIndex((line) => line.type !== 'context')
+    const start = firstChange === -1 ? 0 : Math.max(0, firstChange - Math.floor(DIFF_PREVIEW_LINE_LIMIT / 3))
+    return { visibleLines: lines.slice(start, start + DIFF_PREVIEW_LINE_LIMIT), windowStart: start }
+  }, [isExpanded, lines])
 
   return (
     <Card className="border-purple-500/20 bg-black/40 shadow-none">
@@ -70,10 +79,13 @@ const DiffPreviewCard = ({ messageId, diff, status = 'pending', isPreviewing = f
             {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             {isExpanded ? 'Collapse' : 'Expand'}
           </button>
-          {!isExpanded && lines.length > DIFF_PREVIEW_LINE_LIMIT ? <span>Showing {DIFF_PREVIEW_LINE_LIMIT} of {lines.length} lines</span> : null}
+          {!isExpanded && lines.length > DIFF_PREVIEW_LINE_LIMIT ? (
+            <span>Showing lines {windowStart + 1}–{windowStart + visibleLines.length} of {lines.length}</span>
+          ) : null}
         </div>
 
         <div className="max-h-56 overflow-auto rounded-md border border-zinc-900 bg-zinc-950/90 p-3 font-mono text-xs">
+          {windowStart > 0 ? <div className="px-1 text-zinc-600">…</div> : null}
           {visibleLines.map((line, index) => (
             <div
               key={`${line.type}-${index}`}
@@ -127,4 +139,4 @@ const DiffPreviewCard = ({ messageId, diff, status = 'pending', isPreviewing = f
   )
 }
 
-export default DiffPreviewCard
+export default memo(DiffPreviewCard)
