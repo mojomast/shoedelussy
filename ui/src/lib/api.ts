@@ -24,6 +24,7 @@ interface ChatStreamHandlers {
   onChunk?: (chunk: string) => void
   onDone?: (response: AIResponse) => void
   onStreamError?: (error: ChatStreamErrorInfo) => void
+  onReset?: () => void
   signal?: AbortSignal
 }
 
@@ -194,6 +195,10 @@ export const api = {
 
         if (parsed.type === 'chunk' && parsed.chunk) {
           handlers.onChunk?.(parsed.chunk)
+          return false
+        }
+        if (parsed.type === 'reset') {
+          handlers.onReset?.()
           return false
         }
         if (parsed.type === 'error' || parsed.type === 'contract_error') {

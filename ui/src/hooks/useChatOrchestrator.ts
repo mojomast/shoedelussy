@@ -755,6 +755,18 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
       userId,
       {
       signal: abortController.signal,
+      onReset: () => {
+        // Server is discarding the first attempt and streaming a corrected one.
+        if (flushStreamFrameRef.current) {
+          window.cancelAnimationFrame(flushStreamFrameRef.current)
+          flushStreamFrameRef.current = null
+        }
+        bufferedStreamContentRef.current = ''
+        const resetMessages = useProjectStore.getState().chatMessages.map((message) =>
+          message.id === streamingAssistantId ? { ...message, content: '' } : message,
+        )
+        actions.setChatMessages(resetMessages)
+      },
       onChunk: (chunk) => {
         setChatStatus('Streaming response...')
         bufferedStreamContentRef.current += chunk

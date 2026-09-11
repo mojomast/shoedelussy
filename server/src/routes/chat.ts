@@ -5,7 +5,7 @@ import type { ChatCompletionMessageParam } from 'openai/resources/chat/completio
 import type { Env } from '../index'
 import { parseChatJsonResponseSafe, unsupportedSoundNames, VERIFIED_BANK_VOICES } from '../lib/aiContract'
 import { getDefaultLlmConfig } from '../lib/llm'
-import { STRUDEL_REFERENCE } from '../lib/strudel-docs'
+import { STRUDEL_CHAT_REFERENCE } from '../lib/strudel-docs'
 
 const ALLOWED_MODELS = [
   'google/gemini-2.5-flash',
@@ -82,6 +82,15 @@ const getSelectedModel = (env: Env, payload: ChatPayload): string => {
     : getDefaultLlmConfig(env).model) as (typeof ALLOWED_MODELS)[number] | string
 }
 
+// Detect providers that do not accept `response_format` so we can retry
+// without it instead of failing the whole request.
+const isResponseFormatError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  const status = (error as { status?: number } | null)?.status
+  return (status === 400 || status === 422 || status === undefined)
+    && /response_format|json[_ ]?object|json mode/i.test(message)
+}
+
 chatRoute.post('/models', async (c) => {
   try {
     const payload = await c.req.json<ModelsPayload>()
@@ -148,7 +157,7 @@ JSON shape:
 }
 
 Core Strudel reference:
-${STRUDEL_REFERENCE}`
+${STRUDEL_CHAT_REFERENCE}`
 
 const buildShoedelussyPrompt = (payload: ChatPayload) => `You are an expert Strudel live coding assistant.
 Your ONLY job is to help the user create and refine music using supported Strudel code.
@@ -272,7 +281,7 @@ DECISION LADDER
 5. If the user reports an error or warning, fix the likely cause in the code instead of merely describing it.
 
 Condensed Strudel reference:
-${STRUDEL_REFERENCE}`
+${STRUDEL_CHAT_REFERENCE}`
 
 const buildSystemPrompt = (payload: ChatPayload) =>
   [
@@ -339,34 +348,71 @@ chatRoute.post('/', async (c) => {
         void stream.write(': keep-alive\n\n')
       }, 10000)
 
-      try {
-        const completion = await openai.chat.completions.create({
+      const canUseJsonMode = !payload.provider?.endpoint
+
+      const requestCompletion = (useJsonMode: boolean, requestMessages: ChatCompletionMessageParam[]) =>
+        openai.chat.completions.create({
           model: selectedModel,
           temperature: 0.4,
           max_tokens: MAX_RESPONSE_TOKENS,
-          messages,
+          messages: requestMessages,
           stream: true,
+          ...(useJsonMode ? { response_format: { type: 'json_object' as const } } : {}),
         })
 
-        let content = ''
+      const runCompletion = async (useJsonMode: boolean, requestMessages: ChatCompletionMessageParam[]) => {
+        try {
+          return await requestCompletion(useJsonMode, requestMessages)
+        } catch (error) {
+          if (useJsonMode && isResponseFormatError(error)) {
+            console.warn('Provider rejected JSON mode; retrying without response_format.')
+            return await requestCompletion(false, requestMessages)
+          }
+          throw error
+        }
+      }
 
+      const streamCompletion = async (completion: AsyncIterable<any>) => {
+        let text = ''
         for await (const chunk of completion) {
-          const delta = chunk.choices[0]?.delta?.content ?? ''
+          const delta = chunk?.choices?.[0]?.delta?.content ?? ''
           if (!delta) continue
-          content += delta
+          text += delta
           await stream.write(`data: ${JSON.stringify({ type: 'chunk', chunk: delta })}\n\n`)
         }
+        return text
+      }
 
-        if (!content.trim()) {
-          await stream.write(`data: ${JSON.stringify({ type: 'error', error: 'LLM returned an empty response' })}\n\n`)
-          await stream.write('data: [DONE]\n\n')
-          return
+      try {
+        let content = await streamCompletion(await runCompletion(canUseJsonMode, messages))
+        let parsed = content.trim()
+          ? parseChatJsonResponseSafe(content.trim(), payload.current_code)
+          : { ok: false as const, message: 'The model returned an empty response.' }
+
+        if (!parsed.ok) {
+          // Ask the model once more, feeding back the exact parse error. The
+          // `reset` event tells the client to discard the first (unusable)
+          // attempt before we stream the corrected one.
+          await stream.write(`data: ${JSON.stringify({ type: 'reset' })}\n\n`)
+          const repairMessages: ChatCompletionMessageParam[] = [
+            ...messages,
+            ...(content.trim() ? [{ role: 'assistant' as const, content: content.slice(0, 2000) }] : []),
+            {
+              role: 'user' as const,
+              content: `Your previous reply could not be used: ${parsed.message} Reply again with ONLY one valid JSON object with exactly these keys: message, code, diff_summary, has_code_change. Put the FULL updated Strudel code in "code" and escape every newline as \\n.`,
+            },
+          ]
+          try {
+            content = await streamCompletion(await runCompletion(false, repairMessages))
+            parsed = content.trim()
+              ? parseChatJsonResponseSafe(content.trim(), payload.current_code)
+              : { ok: false as const, message: 'The retry returned an empty response.' }
+          } catch (repairError) {
+            console.error('Chat self-repair attempt failed:', repairError)
+          }
         }
 
-        const parsed = parseChatJsonResponseSafe(content.trim(), payload.current_code)
         if (!parsed.ok) {
-          // Signal a contract violation so the client can retry once instead of
-          // treating a malformed reply as a successful answer.
           await stream.write(`data: ${JSON.stringify({ type: 'contract_error', error: `Invalid response: ${parsed.message}` })}\n\n`)
           await stream.write('data: [DONE]\n\n')
           return

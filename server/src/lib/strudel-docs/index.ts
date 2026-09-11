@@ -76,6 +76,43 @@ ${SECTION_RECIPES}
 
 ${SECTION_AVAILABLE_SOUNDS}`;
 
+// Leaner reference for the chat route. Drops the raw sound-name dump (the chat
+// prompt already carries a curated pack list) and the long recipe gallery to
+// cut per-request tokens and reduce "lost in the middle" instruction dilution.
+export const STRUDEL_CHAT_REFERENCE = `${SECTION_INTRODUCTION}
+
+---
+
+${SECTION_BASIC_CONCEPTS}
+
+---
+
+${SECTION_MINI_NOTATION}
+
+---
+
+${SECTION_SOUNDS}
+
+---
+
+${SECTION_NOTES}
+
+---
+
+${SECTION_EFFECTS}
+
+---
+
+${SECTION_PATTERN_TRANSFORMATIONS}
+
+---
+
+${SECTION_ADVANCED_TECHNIQUES}
+
+---
+
+${SECTION_COMMON_MISTAKES}`;
+
 // Full bundle including the raw-code generation instructions. Used by the
 // non-streaming /generate route, which does expect plain Strudel code.
 export const STRUDEL_DOCS = `${STRUDEL_REFERENCE}
