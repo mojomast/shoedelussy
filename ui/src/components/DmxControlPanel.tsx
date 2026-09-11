@@ -100,7 +100,8 @@ const DmxControlPanel = ({
     await postControl('/scenes/apply', { scene_id: sceneId })
   }
 
-  const peak = data ? Math.max(0, ...data.universe.channels) : 0
+  const channels = data?.universe?.channels ?? []
+  const peak = channels.length > 0 ? Math.max(0, ...channels) : 0
   const cueBindings = lighting.cue_bindings
   const groupBindings = lighting.group_bindings
 

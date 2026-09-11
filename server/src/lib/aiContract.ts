@@ -10,8 +10,10 @@ export const MAX_CODE_LINES = 240
 
 const UNSUPPORTED_METHOD_NAMES = ['bend', 'stutter', 'bounce', 'pingpong', 'trancegate', 'rlpf', 'acidenv'] as const
 const UNSUPPORTED_METHOD_PATTERN = new RegExp(`\\.(${UNSUPPORTED_METHOD_NAMES.join('|')})\\s*\\(`, 'g')
-const SOMETIMES_BY_SINGLE_ARG_PATTERN = /\.sometimesBy\s*\(\s*[^,()]+\s*\)/g
-const EMPTY_PATTERN_CALL_PATTERN = /\b(?:s|n|note|sound|mini)\(\s*(["'])\s*\1\s*\)/g
+// These are only used with `.test()`. They must NOT be global, otherwise the
+// shared `lastIndex` makes `.test()` alternate between true/false across calls.
+const SOMETIMES_BY_SINGLE_ARG_PATTERN = /\.sometimesBy\s*\(\s*[^,()]+\s*\)/
+const EMPTY_PATTERN_CALL_PATTERN = /\b(?:s|n|note|sound|mini)\(\s*(["'])\s*\1\s*\)/
 
 export const unsupportedSoundNames = ['chirp', 'bongo', 'conga', 'timbale', 'cowbell', 'tambourine', 'clap2']
 
@@ -228,23 +230,31 @@ export const sanitizeStrudelCode = (input: string): SanitizedCodeResult => {
   }
 }
 
-export const parseChatJsonResponse = (content: string, currentCode: string): AIResponseContract => {
+export type ChatJsonParseResult =
+  | { ok: true; response: AIResponseContract }
+  | { ok: false; message: string }
+
+// Distinguishes a genuine "no change needed" reply (ok:true) from a contract
+// violation (ok:false) so callers can retry or surface errors explicitly.
+export const parseChatJsonResponseSafe = (content: string, currentCode: string): ChatJsonParseResult => {
   const cleaned = stripMarkdownFences(content).trim()
-  const jsonCandidate = cleaned.startsWith('{') ? extractFirstJsonObject(cleaned) ?? cleaned : extractFirstJsonObject(cleaned)
+  // For `{`-leading output, pass the raw text through so parsing fails as
+  // "malformed JSON" rather than "not JSON at all".
+  const jsonCandidate = extractFirstJsonObject(cleaned) ?? (cleaned.startsWith('{') ? cleaned : null)
 
   if (!jsonCandidate) {
-    return contractFailure('The model returned text instead of the required JSON object. Ask again with a smaller, more specific request.')
+    return { ok: false, message: 'The model returned text instead of the required JSON object. Ask again with a smaller, more specific request.' }
   }
 
   let parsed: unknown
   try {
     parsed = JSON.parse(jsonCandidate)
   } catch {
-    return contractFailure('The model returned malformed JSON. Ask again with a smaller, more specific request.')
+    return { ok: false, message: 'The model returned malformed JSON. Ask again with a smaller, more specific request.' }
   }
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return contractFailure('The model JSON did not match the required response object.')
+    return { ok: false, message: 'The model JSON did not match the required response object.' }
   }
 
   const response = parsed as Record<string, unknown>
@@ -254,7 +264,7 @@ export const parseChatJsonResponse = (content: string, currentCode: string): AIR
     || typeof response.diff_summary !== 'string'
     || typeof response.has_code_change !== 'boolean'
   ) {
-    return contractFailure('The model JSON did not match the required schema with message, code, diff_summary, and has_code_change.')
+    return { ok: false, message: 'The model JSON did not match the required schema with message, code, diff_summary, and has_code_change.' }
   }
 
   const message = response.message.trim() || 'Updated the project.'
@@ -262,45 +272,59 @@ export const parseChatJsonResponse = (content: string, currentCode: string): AIR
 
   if (!response.has_code_change) {
     return {
-      message,
-      code: '',
-      diff_summary: '',
-      has_code_change: false,
+      ok: true,
+      response: {
+        message,
+        code: '',
+        diff_summary: '',
+        has_code_change: false,
+      },
     }
   }
 
   if (!response.code.trim()) {
-    return contractFailure('The model claimed to change code but did not include the full updated Strudel project.')
+    return { ok: false, message: 'The model claimed to change code but did not include the full updated Strudel project.' }
   }
 
   const sanitized = sanitizeStrudelCode(response.code)
   if (sanitized.blockingIssue) {
-    return contractFailure(`${message} ${sanitized.blockingIssue}`.trim())
+    return { ok: false, message: `${message} ${sanitized.blockingIssue}`.trim() }
   }
 
   const nextCode = sanitized.code
   const lineCount = nextCode.split('\n').length
   if (nextCode.length > MAX_CODE_LENGTH || lineCount > MAX_CODE_LINES) {
-    return contractFailure('The proposed code change is too large to review safely. Ask for a smaller, more focused edit.')
+    return { ok: false, message: 'The proposed code change is too large to review safely. Ask for a smaller, more focused edit.' }
   }
 
   if (normalizeCodeForComparison(nextCode) === normalizeCodeForComparison(currentCode)) {
     return {
-      message,
-      code: '',
-      diff_summary: '',
-      has_code_change: false,
+      ok: true,
+      response: {
+        message,
+        code: '',
+        diff_summary: '',
+        has_code_change: false,
+      },
     }
   }
 
   const substitutionMessage = sanitized.substitutions.join(' ')
 
   return {
-    message: substitutionMessage ? `${message} ${substitutionMessage}`.trim() : message,
-    code: nextCode,
-    diff_summary: diffSummary || 'Updated the Strudel pattern.',
-    has_code_change: true,
+    ok: true,
+    response: {
+      message: substitutionMessage ? `${message} ${substitutionMessage}`.trim() : message,
+      code: nextCode,
+      diff_summary: diffSummary || 'Updated the Strudel pattern.',
+      has_code_change: true,
+    },
   }
+}
+
+export const parseChatJsonResponse = (content: string, currentCode: string): AIResponseContract => {
+  const result = parseChatJsonResponseSafe(content, currentCode)
+  return result.ok ? result.response : contractFailure(result.message)
 }
 
 export const extractGeneratedCode = (content: string): string => {

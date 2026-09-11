@@ -22,7 +22,15 @@ const ArrangePanel = ({ code, collapsed, onToggle, onApplyCode }: ArrangePanelPr
   const [previewCode, setPreviewCode] = useState(code)
 
   useEffect(() => {
-    setMasks(buildInitialMasks(tracks))
+    // Preserve any mask toggles the user already made; only add defaults for
+    // newly detected tracks. This effect fires on every editor keystroke.
+    setMasks((current) => {
+      const next: Record<string, boolean[]> = {}
+      for (const track of tracks) {
+        next[track.id] = current[track.id] ?? [...DEFAULT_CELLS]
+      }
+      return next
+    })
     setPreviewCode(code)
   }, [code, tracks])
 

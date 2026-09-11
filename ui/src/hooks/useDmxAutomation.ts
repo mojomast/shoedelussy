@@ -75,6 +75,7 @@ export const useDmxAutomation = ({
   const [activeLightingGroup, setActiveLightingGroup] = useState<string | null>(null)
   const [automationStatus, setAutomationStatus] = useState<AutomationStatusEntry[]>([])
   const groupPulseTimersRef = useRef<Map<string, number>>(new Map())
+  const groupStepTimersRef = useRef<Map<string, number[]>>(new Map())
   const stepTimerIdsRef = useRef<number[]>([])
   const demoFallbackTimersRef = useRef<number[]>([])
   const lastGroupPulseKeysRef = useRef<Set<string>>(new Set())
@@ -110,8 +111,19 @@ export const useDmxAutomation = ({
           remaining_ms: Math.max(0, Math.round(meta.ends_at - now)),
         }))
         .filter((entry) => entry.remaining_ms > 0)
-      setAutomationStatus(next)
-    }, 50)
+      // Reuse the previous array when nothing changed so React can bail out.
+      setAutomationStatus((previous) => {
+        const unchanged = previous.length === next.length && previous.every((entry, index) => {
+          const candidate = next[index]
+          return !!candidate
+            && entry.group_id === candidate.group_id
+            && entry.track_name === candidate.track_name
+            && entry.intensity === candidate.intensity
+            && entry.remaining_ms === candidate.remaining_ms
+        })
+        return unchanged ? previous : next
+      })
+    }, 100)
 
     return () => window.clearInterval(interval)
   }, [shouldTrackAutomationStatus])
@@ -130,8 +142,9 @@ export const useDmxAutomation = ({
       window.clearTimeout(timerId)
     }
     stepTimerIdsRef.current = []
+    groupStepTimersRef.current.clear()
     for (const timerId of demoFallbackTimersRef.current) {
-      window.clearTimeout(timerId)
+      window.clearInterval(timerId)
     }
     demoFallbackTimersRef.current = []
     groupPulseMetaRef.current.clear()
@@ -139,6 +152,22 @@ export const useDmxAutomation = ({
     setAutomationStatus([])
     setActiveLightingGroup(null)
   }, [isPlaying])
+
+  useEffect(() => () => {
+    for (const timer of groupPulseTimersRef.current.values()) {
+      window.clearTimeout(timer)
+    }
+    groupPulseTimersRef.current.clear()
+    for (const timerId of stepTimerIdsRef.current) {
+      window.clearTimeout(timerId)
+    }
+    stepTimerIdsRef.current = []
+    groupStepTimersRef.current.clear()
+    for (const timerId of demoFallbackTimersRef.current) {
+      window.clearInterval(timerId)
+    }
+    demoFallbackTimersRef.current = []
+  }, [])
 
   const pulseBinding = useCallback((binding: LightingTrackBinding) => {
     if (!dmxBridgeUrl) {
@@ -162,6 +191,12 @@ export const useDmxAutomation = ({
     if (existingTimer) {
       window.clearTimeout(existingTimer)
     }
+    // Cancel any in-flight fade steps for this group so a newer pulse cannot be
+    // overwritten by decreasing intensities from an older one.
+    for (const timerId of groupStepTimersRef.current.get(binding.group_id) ?? []) {
+      window.clearTimeout(timerId)
+    }
+    groupStepTimersRef.current.delete(binding.group_id)
 
     const releaseTimer = window.setTimeout(() => {
       const fadeSteps = fadeMs > 0 ? Math.max(1, Math.round(fadeMs / 50)) : 1
@@ -173,11 +208,13 @@ export const useDmxAutomation = ({
           if (step === fadeSteps) {
             groupPulseMetaRef.current.delete(binding.group_id)
             stepTimerIdsRef.current = stepTimerIdsRef.current.filter((timerId) => timerId !== stepTimerId)
+            groupStepTimersRef.current.delete(binding.group_id)
           }
         }, step * Math.max(1, Math.floor(fadeMs / Math.max(1, fadeSteps))))
         nextStepTimerIds.push(stepTimerId)
       }
       stepTimerIdsRef.current.push(...nextStepTimerIds)
+      groupStepTimersRef.current.set(binding.group_id, nextStepTimerIds)
       groupPulseTimersRef.current.delete(binding.group_id)
     }, holdMs)
 
@@ -236,7 +273,7 @@ export const useDmxAutomation = ({
 
     return () => {
       for (const timerId of demoFallbackTimersRef.current) {
-        window.clearTimeout(timerId)
+        window.clearInterval(timerId)
       }
       demoFallbackTimersRef.current = []
     }

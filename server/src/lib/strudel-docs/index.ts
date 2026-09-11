@@ -30,7 +30,10 @@ import { SECTION_AVAILABLE_SOUNDS } from './14-available-sounds.js';
 // ============================================================================
 // This is the complete documentation - use when you need comprehensive details
 
-export const STRUDEL_DOCS = `${SECTION_INTRODUCTION}
+// Reference sections shared by every prompt. Deliberately excludes
+// SECTION_INSTRUCTIONS, whose "return ONLY Strudel code" output rule conflicts
+// with the chat route's JSON contract.
+export const STRUDEL_REFERENCE = `${SECTION_INTRODUCTION}
 
 ---
 
@@ -71,12 +74,15 @@ ${SECTION_RECIPES}
 
 ---
 
-${SECTION_AVAILABLE_SOUNDS}
+${SECTION_AVAILABLE_SOUNDS}`;
+
+// Full bundle including the raw-code generation instructions. Used by the
+// non-streaming /generate route, which does expect plain Strudel code.
+export const STRUDEL_DOCS = `${STRUDEL_REFERENCE}
 
 ---
 
 ${SECTION_INSTRUCTIONS}
-
 `;
 
 // ${SECTION_FULL_SONG_EXAMPLES} // Currently left out.

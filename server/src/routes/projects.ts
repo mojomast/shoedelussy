@@ -4,9 +4,19 @@ import { deleteProjectRecord, getProjectRecord, listProjectRecords, saveProjectR
 
 export const projectsRoute = new Hono<{ Bindings: Env }>()
 
+const MAX_VERSIONS = 100
+
 const getUserId = (c: Parameters<typeof projectsRoute.get>[1] extends never ? never : any): string | null => {
-  const userId = c.req.header('x-user-id')
-  return userId && userId.trim().length > 0 ? userId : null
+  const userId = c.req.header('x-user-id')?.trim()
+  return userId && userId.length > 0 ? userId : null
+}
+
+const readJson = async <T>(c: any): Promise<T | null> => {
+  try {
+    return await c.req.json<T>()
+  } catch {
+    return null
+  }
 }
 
 const ensureUserId = (c: Parameters<typeof projectsRoute.get>[1] extends never ? never : any): string | Response => {
@@ -36,12 +46,16 @@ projectsRoute.post('/', async (c) => {
   const userId = ensureUserId(c)
   if (typeof userId !== 'string') return userId
 
-  const body = await c.req.json<Partial<ProjectRecord>>()
+  const body = await readJson<Partial<ProjectRecord>>(c)
+  if (!body) {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+
   const now = new Date().toISOString()
   const project: ProjectRecord = {
     id: body.id || crypto.randomUUID(),
     user_id: userId,
-    name: body.name || 'Untitled Project',
+    name: body.name?.trim() || 'Untitled Project',
     description: body.description,
     strudel_code: body.strudel_code || '',
     chat_history: body.chat_history || [],
@@ -81,13 +95,17 @@ projectsRoute.put('/:id', async (c) => {
     return c.json({ error: 'Project not found' }, 404)
   }
 
-  const body = await c.req.json<Partial<ProjectRecord>>()
+  const body = await readJson<Partial<ProjectRecord>>(c)
+  if (!body) {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+
   const now = new Date().toISOString()
 
   const project: ProjectRecord = {
     id: projectId,
     user_id: userId,
-    name: body.name || existing.name || 'Untitled Project',
+    name: body.name?.trim() || existing.name || 'Untitled Project',
     description: body.description ?? existing.description,
     strudel_code: body.strudel_code ?? existing.strudel_code ?? '',
     chat_history: body.chat_history ?? existing.chat_history ?? [],
@@ -138,7 +156,11 @@ projectsRoute.post('/:id/versions', async (c) => {
     return c.json({ error: 'Project not found' }, 404)
   }
 
-  const body = await c.req.json<Partial<CodeVersion>>()
+  const body = await readJson<Partial<CodeVersion>>(c)
+  if (!body) {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+
   const version: CodeVersion = {
     id: crypto.randomUUID(),
     code: body.code || project.strudel_code,
@@ -149,7 +171,7 @@ projectsRoute.post('/:id/versions', async (c) => {
 
   const updatedProject: ProjectRecord = {
     ...project,
-    versions: [version, ...project.versions],
+    versions: [version, ...project.versions].slice(0, MAX_VERSIONS),
     updated_at: new Date().toISOString(),
   }
 

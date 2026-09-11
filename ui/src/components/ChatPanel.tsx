@@ -58,6 +58,7 @@ const ChatPanel = ({
 }: ChatPanelProps) => {
   const [value, setValue] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
+  const stickToBottomRef = useRef(true)
   const promptChips = [
     'Add a hard-hitting B section',
     'Make this darker and more danceable',
@@ -68,8 +69,18 @@ const ChatPanel = ({
   useEffect(() => {
     const container = threadRef.current
     if (!container || activeTab !== 'chat') return
-    container.scrollTop = container.scrollHeight
+    // Only auto-scroll when the user is already near the bottom, so reading
+    // earlier messages is not interrupted by incoming chunks.
+    if (stickToBottomRef.current) {
+      container.scrollTop = container.scrollHeight
+    }
   }, [activeTab, messages, isSending])
+
+  const handleThreadScroll = () => {
+    const container = threadRef.current
+    if (!container) return
+    stickToBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 80
+  }
 
   const canSend = useMemo(() => value.trim().length > 0, [value])
 
@@ -170,7 +181,7 @@ const ChatPanel = ({
         </div>
       ) : (
         <>
-          <div id="chat-panel-tab" ref={threadRef} className="flex-1 space-y-4 overflow-auto px-3 py-3 sm:px-4 sm:py-4">
+          <div id="chat-panel-tab" ref={threadRef} onScroll={handleThreadScroll} className="flex-1 space-y-4 overflow-auto px-3 py-3 sm:px-4 sm:py-4">
             {messages.map((message) => {
               const lessonMatch = getLessonMatch(message)
 
@@ -189,7 +200,7 @@ const ChatPanel = ({
                         {message.role === 'assistant' &&
                         !message.status &&
                         !message.code_diff &&
-                        message.content.trimStart().startsWith('{')
+                        /^\s*(?:```[a-z]*\s*)?\{/.test(message.content)
                           ? '\u2726 Composing...'
                           : message.content}
                       </div>

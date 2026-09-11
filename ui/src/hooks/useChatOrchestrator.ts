@@ -78,6 +78,7 @@ const EMPTY_RESPONSE_PATTERNS = [
   'streaming chat ended before final response was received',
   'streaming chat ended without a final structured response',
   'llm returned an empty response',
+  'invalid response',
 ]
 
 const RATE_LIMIT_PATTERN = /rate limit/i
@@ -564,14 +565,18 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
     const handleKeyDown = (event: KeyboardEvent) => {
       const modifierKey = navigator.platform.includes('Mac') ? event.metaKey : event.ctrlKey
       const target = event.target as HTMLElement | null
-      const isTextInput = !!target && (
+      const isInteractiveTarget = !!target && (
         target.tagName === 'TEXTAREA'
         || target.tagName === 'INPUT'
+        || target.tagName === 'SELECT'
+        || target.tagName === 'BUTTON'
+        || target.tagName === 'A'
         || target.isContentEditable
+        || !!target.closest('[role="button"],[role="tab"],[role="menuitem"],[role="option"]')
       )
 
       if (event.code === 'Space') {
-        if (!isTextInput) {
+        if (!isInteractiveTarget) {
           event.preventDefault()
           if (isPlaying) {
             editorBridgeRef.current.stop?.()
@@ -581,7 +586,7 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
         }
       }
 
-      if (event.key === '?' && !isTextInput) {
+      if (event.key === '?' && !isInteractiveTarget) {
         event.preventDefault()
         setShowShortcuts((current) => !current)
       }
@@ -612,7 +617,20 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      setCycleInfo(editorBridgeRef.current.getCycleInfo?.() ?? null)
+      const next = editorBridgeRef.current.getCycleInfo?.() ?? null
+      // Bail out when nothing changed so idle playback does not re-render the app.
+      setCycleInfo((previous) => {
+        if (!next) return previous === null ? previous : null
+        if (
+          previous
+          && previous.phase === next.phase
+          && previous.cps === next.cps
+          && previous.cycleDurationMs === next.cycleDurationMs
+        ) {
+          return previous
+        }
+        return next
+      })
     }, 100)
     return () => window.clearInterval(interval)
   }, [])
@@ -745,6 +763,14 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
         flushBufferedChunk()
       },
       onDone: (finalResponse) => {
+        // Cancel any pending throttled flush so it cannot append raw stream
+        // tokens onto the finalized assistant message.
+        if (flushStreamFrameRef.current) {
+          window.cancelAnimationFrame(flushStreamFrameRef.current)
+          flushStreamFrameRef.current = null
+        }
+        bufferedStreamContentRef.current = ''
+        setChatError(null)
         setChatStatus(finalResponse.has_code_change ? 'Patch ready for review.' : 'Response ready.')
         const assistantMessage: ChatMessage = {
           id: streamingAssistantId,
@@ -790,6 +816,10 @@ export const useChatOrchestrator = ({ searchParams, setSearchParams, routeShareI
         } catch (error) {
           const shouldRetry = attempt === 0 && isRetryableEmptyResponseError(error)
           if (shouldRetry) {
+            // Clear the previous attempt's error so a successful retry is not
+            // still reported as failed.
+            requestEndedWithError = false
+            setChatError(null)
             const resetMessages = useProjectStore.getState().chatMessages.map((message) =>
               message.id === streamingAssistantId ? { ...message, content: '' } : message,
             )

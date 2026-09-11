@@ -103,9 +103,8 @@ export const findProjectAcrossUsers = async (env: Env, projectId: string): Promi
 }
 
 export const saveProjectForMcp = async (env: Env, project: ProjectRecord): Promise<ProjectRecord> => {
-  const saved = await saveProjectRecord(env, project)
-  await env.PROJECTS_KV.put(getMcpProjectId(project.id), project.user_id)
-  return saved
+  // saveProjectRecord already writes the mcp-project index mapping.
+  return saveProjectRecord(env, project)
 }
 
 export const listAllProjectsForMcp = async (env: Env): Promise<ProjectRecord[]> => {

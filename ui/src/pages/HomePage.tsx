@@ -80,7 +80,7 @@ const HomePage = () => {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleUiMode, tutorial])
+  }, [toggleUiMode, tutorial.state.activeTab, tutorial.setActiveTab, tutorial.openTutorial])
 
   const refreshDmxVisualization = useCallback(async () => {
     if (!dmxBridgeUrl) {

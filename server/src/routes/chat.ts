@@ -3,9 +3,9 @@ import { streamText } from 'hono/streaming'
 import OpenAI from 'openai'
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 import type { Env } from '../index'
-import { parseChatJsonResponse, unsupportedSoundNames, VERIFIED_BANK_VOICES } from '../lib/aiContract'
+import { parseChatJsonResponseSafe, unsupportedSoundNames, VERIFIED_BANK_VOICES } from '../lib/aiContract'
 import { getDefaultLlmConfig } from '../lib/llm'
-import { STRUDEL_DOCS } from '../lib/strudel-docs'
+import { STRUDEL_REFERENCE } from '../lib/strudel-docs'
 
 const ALLOWED_MODELS = [
   'google/gemini-2.5-flash',
@@ -15,6 +15,8 @@ const ALLOWED_MODELS = [
 ] as const
 
 const MAX_CHAT_HISTORY = 20
+// 8000-char / 240-line code cap leaves plenty of headroom while bounding cost.
+const MAX_RESPONSE_TOKENS = 4096
 const CODE_BLOCK_START = '```strudel'
 const CODE_BLOCK_END = '```'
 
@@ -145,7 +147,7 @@ JSON shape:
 }
 
 Core Strudel reference:
-${STRUDEL_DOCS}`
+${STRUDEL_REFERENCE}`
 
 const buildShoedelussyPrompt = (payload: ChatPayload) => `You are an expert Strudel live coding assistant.
 Your ONLY job is to help the user create and refine music using supported Strudel code.
@@ -213,9 +215,9 @@ SUPPORTED BEHAVIOR
 - Never use ".sometimesBy(..., x => x)" for rare events or muting. It is a no-op.
 - Never generate empty mini-notation like "s(\"\")", "n(\"\")", or "mini(\"\")".
 - For rare one-shot speech/sample events, prefer an explicit pattern with "~", for example "s(\"blong_is_a_kitty_cat ~ ~ ~ ~ ~ ~ ~ ~ ~\")", instead of inventing clever probability tricks.
-- Use .mask("<0!N 1!M>") for arrangement changes.
+- Use .mask("<0 1 1 1>") for arrangement changes.
 - Use .jux(rev) for subtle stereo interest on melodic patterns.
-- Use .off(1/8, x => x.add(7)) ONLY on melodic patterns built with note() or n(). Never apply .off() to drum or sample patterns.
+- Use .off(1/8, rev) for an echo-style variation. Never use arithmetic like .add()/.mul()/.sub() inside .off() on note() or n() patterns; use rev, gain, or speed transforms instead.
 - Use .every(4, x => x.rev()) for periodic variation.
 - For multi-track code, prefer named $ tracks like drums$: bass$: chords$: lead$: when creating or rewriting stacked arrangements.
 
@@ -244,7 +246,7 @@ DECISION LADDER
 5. If the user reports an error or warning, fix the likely cause in the code instead of merely describing it.
 
 Condensed Strudel reference:
-${STRUDEL_DOCS}`
+${STRUDEL_REFERENCE}`
 
 const buildSystemPrompt = (payload: ChatPayload) =>
   [
@@ -275,14 +277,25 @@ chatRoute.post('/', async (c) => {
     const openai = new OpenAI(getClientOptions(c.env, payload.provider))
     const selectedModel = getSelectedModel(c.env, payload)
 
+    const systemExtras = payload.messages
+      .filter((message) => message.role === 'system')
+      .map((message) => message.content.trim())
+      .filter(Boolean)
+      .slice(-MAX_CHAT_HISTORY)
+
     const recentMessages = payload.messages
       .filter((message) => message.role !== 'system')
       .slice(-MAX_CHAT_HISTORY)
 
+    const systemPrompt = [
+      buildSystemPrompt(payload),
+      systemExtras.length > 0 ? `\n\nCONVERSATION SUMMARY\n\n${systemExtras.join('\n\n')}` : '',
+    ].join('')
+
     const messages: ChatCompletionMessageParam[] = [
-      { role: 'system', content: buildSystemPrompt(payload) },
+      { role: 'system', content: systemPrompt },
       ...recentMessages.map((message) => ({
-        role: message.role === 'assistant' || message.role === 'system' ? message.role : 'user',
+        role: message.role === 'assistant' ? 'assistant' : 'user',
         content: message.content,
       })) as ChatCompletionMessageParam[],
     ]
@@ -301,6 +314,7 @@ chatRoute.post('/', async (c) => {
         const completion = await openai.chat.completions.create({
           model: selectedModel,
           temperature: 0.4,
+          max_tokens: MAX_RESPONSE_TOKENS,
           messages,
           stream: true,
         })
@@ -320,8 +334,16 @@ chatRoute.post('/', async (c) => {
           return
         }
 
-        const parsed = parseChatJsonResponse(content.trim(), payload.current_code)
-        await stream.write(`data: ${JSON.stringify({ type: 'done', response: parsed })}\n\n`)
+        const parsed = parseChatJsonResponseSafe(content.trim(), payload.current_code)
+        if (!parsed.ok) {
+          // Signal a contract violation so the client can retry once instead of
+          // treating a malformed reply as a successful answer.
+          await stream.write(`data: ${JSON.stringify({ type: 'contract_error', error: `Invalid response: ${parsed.message}` })}\n\n`)
+          await stream.write('data: [DONE]\n\n')
+          return
+        }
+
+        await stream.write(`data: ${JSON.stringify({ type: 'done', response: parsed.response })}\n\n`)
         await stream.write('data: [DONE]\n\n')
       } catch (error) {
         await stream.write(`data: ${JSON.stringify({ type: 'error', error: error instanceof Error ? error.message : 'Streaming chat failed' })}\n\n`)

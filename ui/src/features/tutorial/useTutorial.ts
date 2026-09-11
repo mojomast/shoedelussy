@@ -65,28 +65,32 @@ const DEFAULT_LESSON_ID: LessonId = '1.1'
 export const useTutorial = ({ getCode, onLessonLoad }: UseTutorialOptions): UseTutorialReturn => {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const validationDebounceRef = useRef<ReturnType<typeof setTimeout>>()
-  const initialProgress = loadTutorialProgress()
-  const initialLessonId = initialProgress?.currentLessonId && hasLessonId(initialProgress.currentLessonId)
-    ? initialProgress.currentLessonId
-    : DEFAULT_LESSON_ID
+  const [state, setState] = useState<TutorialState>(() => {
+    // Load persisted progress once per mount instead of on every render.
+    const initialProgress = loadTutorialProgress()
+    const initialLessonId = initialProgress?.currentLessonId && hasLessonId(initialProgress.currentLessonId)
+      ? initialProgress.currentLessonId
+      : DEFAULT_LESSON_ID
 
-  const [state, setState] = useState<TutorialState>(() => ({
-    isOpen: false,
-    activeTab: 'chat',
-    activeChapterId: getChapterByLessonId(initialLessonId).id,
-    activeLessonId: initialLessonId,
-    completedLessons: new Set<LessonId>((initialProgress?.completedLessons ?? []).filter(hasLessonId)),
-    showProgressMap: false,
-    hintLevel: initialProgress?.revealedHintCount ?? 0,
-    lastActivity: Date.now(),
-  }))
+    return {
+      isOpen: false,
+      activeTab: 'chat',
+      activeChapterId: getChapterByLessonId(initialLessonId).id,
+      activeLessonId: initialLessonId,
+      completedLessons: new Set<LessonId>((initialProgress?.completedLessons ?? []).filter(hasLessonId)),
+      showProgressMap: false,
+      hintLevel: initialProgress?.revealedHintCount ?? 0,
+      lastActivity: Date.now(),
+    }
+  })
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
 
   const currentLesson = useMemo(() => getLessonById(state.activeLessonId), [state.activeLessonId])
   const currentChapter = useMemo(() => getChapterByLessonId(state.activeLessonId), [state.activeLessonId])
 
   const isChapterUnlocked = useCallback((chapterId: ChapterId) => {
-    if (chapterId === 1) {
+    // The first chapter (0 or 1 depending on data) is always unlocked.
+    if (chapterId <= 1) {
       return true
     }
 

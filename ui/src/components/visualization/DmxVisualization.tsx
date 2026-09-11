@@ -9,7 +9,7 @@ interface DmxVisualizationProps {
 
 const DmxVisualization = ({ data, bridgeUrl }: DmxVisualizationProps) => {
   const [isApplying, setIsApplying] = useState(false)
-  const channels = data?.universe.channels ?? Array.from({ length: 32 }, () => 0)
+  const channels = data?.universe?.channels ?? Array.from({ length: 32 }, () => 0)
   const previewChannels = channels.slice(0, 32)
 
   const handleApplyScene = async (sceneId: string) => {

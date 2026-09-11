@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   extractFirstJsonObject,
   parseChatJsonResponse,
+  parseChatJsonResponseSafe,
   sanitizeStrudelCode,
   validateGeneratedCode,
 } from './aiContract'
@@ -91,10 +92,38 @@ describe('parseChatJsonResponse', () => {
   })
 })
 
+describe('parseChatJsonResponseSafe', () => {
+  it('reports malformed output as a failure', () => {
+    const result = parseChatJsonResponseSafe('not json at all', 'setcps(0.5)')
+    expect(result.ok).toBe(false)
+  })
+
+  it('reports a valid no-change response as success', () => {
+    const result = parseChatJsonResponseSafe(
+      JSON.stringify({ message: 'No change.', code: '', diff_summary: '', has_code_change: false }),
+      'setcps(0.5)',
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.response.has_code_change).toBe(false)
+  })
+})
+
 describe('sanitizeStrudelCode', () => {
   it('blocks one-argument sometimesBy usage', () => {
     const sanitized = sanitizeStrudelCode('setcps(0.5)\n$: s("bd sd").sometimesBy(0.3)')
     expect(sanitized.blockingIssue).toMatch(/sometimesBy/i)
+  })
+
+  it('flags one-argument sometimesBy consistently across repeated calls', () => {
+    const code = 'setcps(0.5)\n$: s("bd sd").sometimesBy(0.3)'
+    expect(sanitizeStrudelCode(code).blockingIssue).toMatch(/sometimesBy/i)
+    expect(sanitizeStrudelCode(code).blockingIssue).toMatch(/sometimesBy/i)
+  })
+
+  it('flags empty mini-notation consistently across repeated calls', () => {
+    const code = 'setcps(0.5)\n$: s("")'
+    expect(sanitizeStrudelCode(code).blockingIssue).toMatch(/empty mini-notation/i)
+    expect(sanitizeStrudelCode(code).blockingIssue).toMatch(/empty mini-notation/i)
   })
 
   it('blocks no-op sometimesBy transforms', () => {

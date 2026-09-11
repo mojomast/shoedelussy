@@ -44,7 +44,7 @@ const syntaxStyle = {
 
 const DiffPreviewCard = ({ messageId, diff, status = 'pending', isPreviewing = false, onApply, onReject, onPreview, onStopPreview }: DiffPreviewCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false)
-  const lines = diffLines(diff.before, diff.after)
+  const lines = useMemo(() => diffLines(diff.before, diff.after), [diff.before, diff.after])
   const visibleLines = useMemo(() => (isExpanded ? lines : lines.slice(0, DIFF_PREVIEW_LINE_LIMIT)), [isExpanded, lines])
 
   return (

@@ -175,7 +175,7 @@ export const api = {
         handlers.onChunk?.(parsed.chunk)
         return false
       }
-      if (parsed.type === 'error') {
+      if (parsed.type === 'error' || parsed.type === 'contract_error') {
         streamError = createChatStreamError(parsed.error || 'Streaming chat failed')
         handlers.onStreamError?.(streamError)
         return true
@@ -192,6 +192,8 @@ export const api = {
       const { done, value } = await reader.read()
       if (done) readerDone = true
       buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done })
+      // Normalize CRLF frame boundaries emitted by some proxies.
+      buffer = buffer.replace(/\r\n/g, '\n')
 
       let boundaryIndex = buffer.indexOf('\n\n')
       while (boundaryIndex !== -1) {
@@ -205,6 +207,8 @@ export const api = {
         }
       }
     }
+
+    void reader.cancel().catch(() => undefined)
 
     if (buffer.trim()) {
       processLine(buffer)
